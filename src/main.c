@@ -9,7 +9,7 @@ int main(int argc,char * argv[]) {
         return 1;
     }
     
-    Mips * emu = new_mips(128 * 1024 * 1024);
+    Mips * emu = new_mips(64 * 1024 * 1024);
     
     if (!emu) {
         puts("allocating emu failed.");

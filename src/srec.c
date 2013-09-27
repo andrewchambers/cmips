@@ -1,6 +1,7 @@
 #include "mips.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 
 static int nextChar(void * ud) {
@@ -21,6 +22,7 @@ int loadSrecFromFile_mips(Mips * emu,char * fname) {
     void * ud = fopen(fname,"r");
     
     if(!ud) {
+        fprintf(stderr,"srec %s failed to open",fname);
         return 1;
     }
     

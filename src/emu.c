@@ -91,7 +91,7 @@ static uint32_t readVirtWord(Mips * emu, uint32_t addr) {
     }
     
     if(paddr % 4 != 0) {
-        printf("Unhandled alignment error reading addr %08x\n",err,addr);
+        printf("Unhandled alignment error reading addr %08x\n",addr);
         exit(1); 
     }
     
@@ -116,7 +116,7 @@ static void writeVirtWord(Mips * emu, uint32_t addr,uint32_t val) {
     }
     
     if(paddr % 4 != 0) {
-        printf("Unhandled alignment error reading addr %08x\n",err,addr);
+        printf("Unhandled alignment error reading addr %08x\n",addr);
         exit(1); 
     }
     
@@ -161,6 +161,7 @@ static uint8_t readVirtByte(Mips * emu, uint32_t addr) {
 
 static void writeVirtByte(Mips * emu, uint32_t addr,uint8_t val) {
     uint32_t paddr;
+    
     int err = translateAddress(emu,addr,&paddr);
     if(err) {
         //printf("Unhandled Memory error %d writing %02x to %08x\n",err,val,addr);
@@ -188,7 +189,8 @@ static void writeVirtByte(Mips * emu, uint32_t addr,uint8_t val) {
 	uint32_t clearmask = ~(0xff<<shamt);
 	uint32_t valmask = (val << shamt);
 	word = (word&clearmask);
-	emu->mem[baseaddr/4] = (word|valmask);
+	word = (word|valmask);
+	emu->mem[baseaddr/4] = word;
 }
 
 
@@ -458,7 +460,7 @@ static void op_ori(Mips * emu,uint32_t op) {
 
 
 static void op_swr(Mips * emu,uint32_t op) {
-    int32_t c = (int32_t)(op&0x0000ffff);
+    int32_t c = (int16_t)(op&0x0000ffff);
     uint32_t addr = (int32_t)getRs(emu,op)+c;
     uint32_t rtVal = getRt(emu,op);
     uint32_t wordVal = readVirtWord(emu,addr&(~3));
@@ -563,9 +565,9 @@ static void op_blez(Mips * emu,uint32_t op) {
 
 static void op_lwr(Mips * emu,uint32_t op) {
     int32_t c = (int16_t)(op&0x0000ffff);
-    uint32_t addr = (int32_t)getRs(emu,op)+c;
+    uint32_t addr = ((int32_t)getRs(emu,op))+c;
     uint32_t rtVal = getRt(emu,op);
-    uint32_t wordVal = readVirtWord(emu,addr&(~3));
+    uint32_t wordVal = readVirtWord(emu,addr & (~3));
     uint32_t offset = addr & 3;
     uint32_t result;
     
@@ -747,8 +749,9 @@ static void op_mfhi(Mips * emu,uint32_t op) {
 
 
 static void op_jalr(Mips * emu,uint32_t op) {
-    printf("unimplemented opcode op_jalr %08x at pc %08x\n",op,emu->pc);
-    exit(1);
+	emu->delaypc = getRs(emu,op);
+	emu->regs[31] = emu->pc + 8;
+	emu->inDelaySlot = 1;
 }
 
 

@@ -37,6 +37,7 @@ typedef struct {
     uint32_t hi;
     uint32_t lo;
     uint32_t pc;
+    uint32_t canary; // memory canary used to trace writes
 } EmuTrace;
 
 EmuTrace * startTrace(char * tracefile);
