@@ -6,6 +6,26 @@
 #define POWERBASE 0x1fbf0004
 #define POWERSIZE 4
 
+
+typedef struct  {
+    uint32_t VPN;
+    uint32_t PageMask;
+    uint8_t ASID;
+    uint16_t G:1;
+    uint32_t C0:3;
+    uint32_t C1:3;
+    uint32_t V0:1;
+    uint32_t V1:1;
+    uint32_t D0:1;
+    uint32_t D1:1;
+    uint32_t PFN[2];
+} TLB_entry;
+
+typedef struct {
+    TLB_entry entries[16];
+} TLB;
+
+
 typedef struct {
     uint32_t * mem;
     uint32_t pmemsz;
@@ -16,7 +36,14 @@ typedef struct {
     uint32_t lo;
     uint32_t delaypc;
     uint8_t inDelaySlot;
+    
+    uint32_t CP0_EntryHi;
+    uint32_t CP0_EntryLo;
+    uint32_t CP0_Status;
+    TLB tlb;
+    
 } Mips;
+
 
 Mips * new_mips(uint32_t physMemSize);
 void free_mips(Mips * mips);

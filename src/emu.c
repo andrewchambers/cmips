@@ -4,6 +4,27 @@
 #include <stdio.h>
 
 
+#define CP0St_CU3   31
+#define CP0St_CU2   30
+#define CP0St_CU1   29
+#define CP0St_CU0   28
+#define CP0St_RP    27
+#define CP0St_FR    26
+#define CP0St_RE    25
+#define CP0St_MX    24
+#define CP0St_PX    23
+#define CP0St_BEV   22
+#define CP0St_TS    21
+#define CP0St_SR    20
+#define CP0St_NMI   19
+#define CP0St_IM    8
+#define CP0St_KX    7
+#define CP0St_SX    6
+#define CP0St_UX    5
+#define CP0St_KSU   3
+#define CP0St_ERL   2
+#define CP0St_EXL   1
+#define CP0St_IE    0
 
 
 char * regn2o32[] = { 
@@ -57,33 +78,80 @@ int32_t sext18(uint32_t val) {
 
 
 //Accessing a phys address which doesnt exist
-#define BUS_ERROR 1
-#define UNALIGNED_ERROR 2
+#define BUS_ERROR 5
+#define UNALIGNED_ERROR 6
+
+
+
+#define TLBRET_MATCH 0
+#define TLBRET_NOMATCH 1
+#define TLBRET_DIRTY 2
+#define TLBRET_INVALID 3
+
+// tlb code modified from qemu
+
+static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int write) {
+    uint8_t ASID = emu->CP0_EntryHi & 0xFF;
+    int i;
+
+    for (i = 0; i < 16; i++) {
+        TLB_entry *tlb_e = &emu->tlb.entries[i];
+        /* 1k pages are not supported. */
+        uint32_t mask = tlb_e->PageMask;
+        uint32_t tag = vaddress & ~mask;
+        uint32_t VPN = tlb_e->VPN & ~mask;
+
+        /* Check ASID, virtual page number & size */
+        if ((tlb_e->G == 1 || tlb_e->ASID == ASID) && VPN == tag) {
+            /* TLB match */
+            int n = !!(vaddress & mask & ~(mask >> 1));
+            /* Check access rights */
+            if (!(n ? tlb_e->V1 : tlb_e->V0))
+                return TLBRET_INVALID;
+            if (write == 0 || (n ? tlb_e->D1 : tlb_e->D0)) {
+                *physical = tlb_e->PFN[n] | (vaddress & (mask >> 1));
+                return TLBRET_MATCH;
+            }
+            return TLBRET_DIRTY;
+        }
+    }
+    return TLBRET_NOMATCH;
+}
+
 
 //returns an error code
-static inline int translateAddress(Mips * emu,uint32_t addr,uint32_t * paddr_out) {
-    
-    uint32_t paddr;
+static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_out,int write) {
     
     
-    if ( addr >= 0x80000000 && addr <= 0x9fffffff ) {
-        paddr = addr - 0x80000000;
-    } else if ( addr >= 0xa0000000 && addr <= 0xbfffffff ) {
-        paddr = addr - 0xa0000000;
+    if (vaddr <= (int32_t)0x7FFFFFFFUL) {
+        /* useg */
+        if (emu->CP0_Status & (1 << CP0St_ERL)) {
+            *paddr_out = vaddr;
+        } else {
+            return tlb_lookup(emu,vaddr,paddr_out, write);
+        }
+    } else if ( vaddr >= 0x80000000 && vaddr <= 0x9fffffff ) {
+        *paddr_out = vaddr - 0x80000000;
+        return 0;
+    } else if ( vaddr >= 0xa0000000 && vaddr <= 0xbfffffff ) {
+        *paddr_out = vaddr - 0xa0000000;
+        return 0;
     } else {
-        *paddr_out = addr;
+        *paddr_out = vaddr;
         return BUS_ERROR;
     }
     
     
-    *paddr_out = paddr;
-    return 0;
+    
+    
+    
 }
+
 
 
 static uint32_t readVirtWord(Mips * emu, uint32_t addr) {
     uint32_t paddr;
-    int err = translateAddress(emu,addr,&paddr);
+    int err = translateAddress(emu,addr,&paddr,0);
     if(err) {
         //printf("Unhandled Memory error %d reading addr %08x\n",err,addr);
         //exit(1);
@@ -109,7 +177,7 @@ static uint32_t readVirtWord(Mips * emu, uint32_t addr) {
 
 static void writeVirtWord(Mips * emu, uint32_t addr,uint32_t val) {
     uint32_t paddr;
-    int err = translateAddress(emu,addr,&paddr);
+    int err = translateAddress(emu,addr,&paddr,1);
     if(err) {
         //printf("Unhandled Memory error %d writing %08x to %08x\n",err,val,addr);
         //exit(1);
@@ -135,7 +203,7 @@ static void writeVirtWord(Mips * emu, uint32_t addr,uint32_t val) {
 
 static uint8_t readVirtByte(Mips * emu, uint32_t addr) {
     uint32_t paddr;
-    int err = translateAddress(emu,addr,&paddr);
+    int err = translateAddress(emu,addr,&paddr,0);
     if(err) {
         //printf("Unhandled Memory error %d reading byte at addr %08x\n",err,addr);
         //exit(1);
@@ -162,7 +230,7 @@ static uint8_t readVirtByte(Mips * emu, uint32_t addr) {
 static void writeVirtByte(Mips * emu, uint32_t addr,uint8_t val) {
     uint32_t paddr;
     
-    int err = translateAddress(emu,addr,&paddr);
+    int err = translateAddress(emu,addr,&paddr,1);
     if(err) {
         //printf("Unhandled Memory error %d writing %02x to %08x\n",err,val,addr);
         //exit(1);
