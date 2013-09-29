@@ -1,4 +1,4 @@
-all: emu ememu.js
+all: emu 
 
 emu: ./src/*.c ./include/*.h ./src/gen/doop.c
 	gcc -O2 -I./include/ ./src/*.c -o emu

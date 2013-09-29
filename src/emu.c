@@ -59,6 +59,11 @@ Mips * new_mips(uint32_t physMemSize) {
     
     ret->mem = mem;
     ret->pmemsz = physMemSize;
+    
+    // Init status registers
+    
+    ret->CP0_Status |= (1 << CP0St_ERL); //start in kernel mode with unmapped useg
+    
     return ret;
 }
 
@@ -93,22 +98,27 @@ int32_t sext18(uint32_t val) {
 static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int write) {
     uint8_t ASID = emu->CP0_EntryHi & 0xFF;
     int i;
-
+    //printf("tlblookup for addr %08x\n",vaddress);
     for (i = 0; i < 16; i++) {
+        //printf("ent %d\n",i);
         TLB_entry *tlb_e = &emu->tlb.entries[i];
         /* 1k pages are not supported. */
         uint32_t mask = tlb_e->PageMask;
         uint32_t tag = vaddress & ~mask;
         uint32_t VPN = tlb_e->VPN & ~mask;
-
+        //printf("mask: %08x tag: %08x vpn %08x\n",mask,tag,VPN);
         /* Check ASID, virtual page number & size */
         if ((tlb_e->G == 1 || tlb_e->ASID == ASID) && VPN == tag) {
             /* TLB match */
             int n = !!(vaddress & mask & ~(mask >> 1));
+            //printf("match! %d \n",n);
             /* Check access rights */
-            if (!(n ? tlb_e->V1 : tlb_e->V0))
+            if (!(n ? tlb_e->V1 : tlb_e->V0)) {
+                //printf("invalid %d %d\n",tlb_e->V1,tlb_e->V0);
                 return TLBRET_INVALID;
+            }
             if (write == 0 || (n ? tlb_e->D1 : tlb_e->D0)) {
+                //printf("\n returning %08x\n",tlb_e->PFN[n] | (vaddress & (mask >> 1)));
                 *physical = tlb_e->PFN[n] | (vaddress & (mask >> 1));
                 return TLBRET_MATCH;
             }
@@ -122,11 +132,11 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
 //returns an error code
 static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_out,int write) {
     
-    
     if (vaddr <= (int32_t)0x7FFFFFFFUL) {
         /* useg */
         if (emu->CP0_Status & (1 << CP0St_ERL)) {
             *paddr_out = vaddr;
+            return 0;
         } else {
             return tlb_lookup(emu,vaddr,paddr_out, write);
         }
@@ -140,10 +150,6 @@ static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_ou
         *paddr_out = vaddr;
         return BUS_ERROR;
     }
-    
-    
-    
-    
     
 }
 
@@ -659,15 +665,132 @@ static void op_lwr(Mips * emu,uint32_t op) {
     setRt(emu,op,result);
 }
 
-
-
-
 static void op_mfc0(Mips * emu,uint32_t op) {
-    printf("unimplemented opcode op_mfc0 %08x at pc %08x\n",op,emu->pc);
-    exit(1);
+    uint32_t regNum = (op&0xf800) >> 11;
+    uint32_t sel = op & 7;
+    uint32_t retval;
+    switch(regNum) {
+        
+        case 0: // Index
+            if(sel != 0) {
+               goto unhandled; 
+            }
+            retval = emu->CP0_Index;
+            break;
+        case 2: //EntryLo0
+            retval = emu->CP0_EntryLo0;
+            break;
+            
+        case 3://EntryLo1
+            retval = emu->CP0_EntryLo1;
+            break;
+            
+        case 5: // Page Mask
+            if(sel != 0) {
+                goto unhandled;
+            }
+            retval = emu->CP0_PageMask;
+            break;
+        
+        case 10: // EntryHi
+            if (sel != 0 ) {
+                goto unhandled;
+            }
+            retval = emu->CP0_EntryHi;
+            break;
+        
+        case 12: // Status
+            if (sel != 0 ) {
+                goto unhandled;
+            }
+            retval = emu->CP0_Status;
+            break;
+        
+        default:
+            unhandled:
+            printf("unhandled cp0 reg selector in mfc0 %d %d\n",regNum,sel);
+            exit(1);
+    }
+    
+    setRt(emu,op,retval);
 }
 
+static void op_mtc0(Mips * emu,uint32_t op) {
+    uint32_t rt = getRt(emu,op);
+    uint32_t regNum = (op&0xf800) >> 11;
+    uint32_t sel = op & 7;
+    
+    switch(regNum) {
+        
+        case 0: // Index
+            if(sel != 0) {
+               goto unhandled; 
+            }
+            
+            emu->CP0_Index = rt & 0xf;
+            break;
+        case 2: // EntryLo0
+            emu->CP0_EntryLo0 = rt & (0x3fffffff);
+            break;
+            
+        case 3: // EntryLo1
+            emu->CP0_EntryLo1 = rt & (0x3fffffff);
+            break;
+            
+        case 5: // Page Mask
+            if(sel != 0) {
+                goto unhandled;
+            }
+            if (rt) {
+                puts("untested page mask!");
+                exit(1);
+            }
+            
+            emu->CP0_PageMask = rt & 0x1ffe000;
+            break;
 
+        case 10: // EntryHi
+            if (sel != 0 ) {
+                goto unhandled;
+            }
+            emu->CP0_EntryHi = rt & (~0x1f00);
+            break;
+            
+        case 12: // Status
+            if (sel != 0 ) {
+                goto unhandled;
+            }
+            emu->CP0_Status = rt;
+            //XXX clear the read only registers
+            //NMI is one way write
+            break;
+                
+        default:
+            unhandled:
+            printf("unhandled cp0 reg selector in mtc0 %d %d\n",regNum,sel);
+            exit(1);
+    }
+    
+}
+
+static void op_tlbwi(Mips * emu, uint32_t op) {
+    
+    uint32_t idx = emu->CP0_Index;
+    
+    TLB_entry * tlbent = &emu->tlb.entries[idx];
+    tlbent->VPN = (emu->CP0_EntryHi & 0xfffff000) >> 12;
+    tlbent->ASID = emu->CP0_EntryHi & 0xff;
+    tlbent->G = (emu->CP0_EntryLo0 | emu->CP0_EntryLo1) & 1;
+    tlbent->V0 = (emu->CP0_EntryLo0 & 2) > 0;
+    tlbent->V1 = (emu->CP0_EntryLo1 & 2) > 0;
+    tlbent->D0 = (emu->CP0_EntryLo0 & 4) > 0;
+    tlbent->D1 = (emu->CP0_EntryLo1 & 4) > 0;
+    tlbent->C0 = (emu->CP0_EntryLo0  >> 3) & 7;
+    tlbent->C1 = (emu->CP0_EntryLo1  >> 3) & 7;
+    tlbent->PFN[0] = ((emu->CP0_EntryLo0 >> 6) & 0xfffff) << 12;
+    tlbent->PFN[1] = ((emu->CP0_EntryLo1 >> 6) & 0xfffff) << 12;
+    
+}
 
 
 static void op_sltu(Mips * emu,uint32_t op) {

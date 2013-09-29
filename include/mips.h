@@ -37,11 +37,14 @@ typedef struct {
     uint32_t delaypc;
     uint8_t inDelaySlot;
     
+    uint32_t CP0_Index;
     uint32_t CP0_EntryHi;
-    uint32_t CP0_EntryLo;
+    uint32_t CP0_EntryLo0;
+    uint32_t CP0_EntryLo1;
+    uint32_t CP0_Wired;
     uint32_t CP0_Status;
+    uint32_t CP0_PageMask;
     TLB tlb;
-    
 } Mips;
 
 

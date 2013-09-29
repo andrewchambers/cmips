@@ -125,7 +125,11 @@
    ],
    [
       "mfc0",
-      "010000xxxxxxxxxxxxxxxxxxxxxxxxxx"
+      "01000000000xxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+      "mtc0",
+      "01000000100xxxxxxxxxxxxxxxxxxxxx"
    ],
    [
       "mult",
@@ -134,6 +138,10 @@
    [
       "multu",
       "000000xxxxxxxxxxxxxxxxxxxx011001"
+   ],
+   [
+      "tlbwi",
+      "01000010000000000000000000000010"
    ],
    [
       "nor",

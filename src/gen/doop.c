@@ -42,9 +42,6 @@ void doop(Mips * emu, uint32_t op) {
         case 0x3c000000:
             op_lui(emu,op);
             return;
-        case 0x40000000:
-            op_mfc0(emu,op);
-            return;
         case 0x80000000:
             op_lb(emu,op);
             return;
@@ -162,6 +159,19 @@ void doop(Mips * emu, uint32_t op) {
             return;
         case 0x4010000:
             op_bgez(emu,op);
+            return;
+    }
+    switch(op & 0xffe00000) {
+        case 0x40000000:
+            op_mfc0(emu,op);
+            return;
+        case 0x40800000:
+            op_mtc0(emu,op);
+            return;
+    }
+    switch(op & 0xffffffff) {
+        case 0x42000002:
+            op_tlbwi(emu,op);
             return;
     }
     printf("unhandled opcode at %x -> %x\n",emu->pc,op);
