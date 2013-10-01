@@ -82,18 +82,48 @@ int32_t sext18(uint32_t val) {
 }
 
 
-//Accessing a phys address which doesnt exist
-#define BUS_ERROR 5
-#define UNALIGNED_ERROR 6
+
+//Possible Values for the EXC field in the status reg
+#define EXC_Int 0
+#define EXC_Mod 1
+#define EXC_TLBL 2
+#define EXC_TLBS 3
+#define EXC_AdEL 4
+#define EXC_AdES 5
+#define EXC_IBE 6
+#define EXC_DBE 7
+#define EXC_SYS 8
+#define EXC_BP 9
+#define EXC_RI 10
+#define EXC_CpU 11
+#define EXC_Ov 12
+#define EXC_Tr 13
+#define EXC_Watch 23
+#define EXC_MCheck 24
+
+static inline uint32_t getExceptionCode(Mips * emu) {
+    return (emu->CP0_Cause >> 2) & 0x1f;
+}
+
+static inline uint32_t setExceptionCode(Mips * emu,int code) {
+    emu->CP0_Cause &= ~(0x1f << 2); // clear exccode
+    emu->CP0_Cause |= (code & 0x1f) << 2; //set with new code
+}
 
 
+//tlb lookup return codes
 
 #define TLBRET_MATCH 0
 #define TLBRET_NOMATCH 1
 #define TLBRET_DIRTY 2
 #define TLBRET_INVALID 3
 
+//Accessing a phys address which doesnt exist
+#define BUS_ERROR 5
+#define UNALIGNED_ERROR 6
+
 // tlb code modified from qemu
+
 
 static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int write) {
     uint8_t ASID = emu->CP0_EntryHi & 0xFF;
@@ -115,6 +145,8 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
             /* Check access rights */
             if (!(n ? tlb_e->V1 : tlb_e->V0)) {
                 //printf("invalid %d %d\n",tlb_e->V1,tlb_e->V0);
+                emu->exceptionOccured = 1;
+                setExceptionCode(0,write ? EXC_TLBS : EXC_TLBL);
                 return TLBRET_INVALID;
             }
             if (write == 0 || (n ? tlb_e->D1 : tlb_e->D0)) {
@@ -122,13 +154,17 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
                 *physical = tlb_e->PFN[n] | (vaddress & (mask >> 1));
                 return TLBRET_MATCH;
             }
+            emu->exceptionOccured = 1;
+            setExceptionCode(0,write ? EXC_TLBS : EXC_TLBL);
             return TLBRET_DIRTY;
         }
     }
+    emu->exceptionOccured = 1;
+    setExceptionCode(0,write ? EXC_TLBS : EXC_TLBL);
     return TLBRET_NOMATCH;
 }
 
-
+//internally triggers exceptions on error
 //returns an error code
 static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_out,int write) {
     
@@ -148,7 +184,7 @@ static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_ou
         return 0;
     } else {
         *paddr_out = vaddr;
-        return BUS_ERROR;
+        return 0;
     }
     
 }
@@ -159,9 +195,7 @@ static uint32_t readVirtWord(Mips * emu, uint32_t addr) {
     uint32_t paddr;
     int err = translateAddress(emu,addr,&paddr,0);
     if(err) {
-        //printf("Unhandled Memory error %d reading addr %08x\n",err,addr);
-        //exit(1);
-        
+        return 0;
     }
     
     if(paddr % 4 != 0) {
@@ -185,8 +219,7 @@ static void writeVirtWord(Mips * emu, uint32_t addr,uint32_t val) {
     uint32_t paddr;
     int err = translateAddress(emu,addr,&paddr,1);
     if(err) {
-        //printf("Unhandled Memory error %d writing %08x to %08x\n",err,val,addr);
-        //exit(1);
+        return;
     }
     
     if(paddr % 4 != 0) {
@@ -211,8 +244,7 @@ static uint8_t readVirtByte(Mips * emu, uint32_t addr) {
     uint32_t paddr;
     int err = translateAddress(emu,addr,&paddr,0);
     if(err) {
-        //printf("Unhandled Memory error %d reading byte at addr %08x\n",err,addr);
-        //exit(1);
+        return 0;
     }
     
     if(paddr >= UARTBASE && paddr <= UARTBASE + UARTSIZE) {
@@ -238,8 +270,7 @@ static void writeVirtByte(Mips * emu, uint32_t addr,uint8_t val) {
     
     int err = translateAddress(emu,addr,&paddr,1);
     if(err) {
-        //printf("Unhandled Memory error %d writing %02x to %08x\n",err,val,addr);
-        //exit(1);
+        return;
     }
     
     if(paddr >= UARTBASE && paddr <= UARTBASE + UARTSIZE) {
@@ -268,14 +299,66 @@ static void writeVirtByte(Mips * emu, uint32_t addr,uint8_t val) {
 }
 
 
+
+void handleException(Mips * emu,int inDelaySlot) {
+
+    uint32_t offset;
+    int exccode = getExceptionCode(emu);
+    
+    if ( (emu->CP0_Status & (1 << CP0St_EXL))  == 0) {
+        if (inDelaySlot) {
+            emu->CP0_Epc = emu->pc - 4;
+            emu->CP0_Cause |= (1 << 31); // set BD
+        } else {
+            emu->CP0_Epc = emu->pc;
+            emu->CP0_Cause &= ~(1 << 31); // clear BD
+        }
+        
+        if (exccode == EXC_TLBL || exccode == EXC_TLBS ) {
+            offset = 0;
+        } else if ( (exccode == EXC_Int) && ((emu->CP0_Cause & (1 << 23)) != 0)) {
+            offset = 0x200;
+        } else {
+            offset = 0x180;
+        }
+    } else {
+        offset = 0x180;
+    }
+    
+    // Faulting coprocessor number set at fault location
+    // exccode set at fault location
+    emu->CP0_Status |= (1 << CP0St_EXL);
+    
+    if (emu->CP0_Status & (1 << CP0St_BEV)) {
+        emu->pc = 0xbfc00200 + offset;
+    } else {
+        emu->pc = 0x80000000 + offset;
+    }
+    
+    emu->exceptionOccured = 0;
+
+}
+
 void step_mips(Mips * emu) {
 
 	int startInDelaySlot = emu->inDelaySlot;
 	
+	
 	uint32_t opcode = readVirtWord(emu,emu->pc);
+	
+	if(emu->exceptionOccured) { //instruction fetch failed
+	    handleException(emu,startInDelaySlot);
+	    return;
+	}
+	
 	
     doop(emu,opcode);
     emu->regs[0] = 0;
+    
+	if(emu->exceptionOccured) { //instruction failed
+	    handleException(emu,startInDelaySlot);
+	    return;
+	}
 
 	if (startInDelaySlot) {
 	    emu->pc = emu->delaypc;
@@ -324,6 +407,9 @@ static void op_swl(Mips * emu,uint32_t op) {
     uint32_t addr = ((int32_t)getRs(emu,op)+c);
     uint32_t rtVal = getRt(emu,op);
     uint32_t wordVal = readVirtWord(emu,addr&(~3));
+    if(emu->exceptionOccured) {
+        return;
+    }
     uint32_t offset = addr&3;
     uint32_t result;
     
@@ -355,6 +441,9 @@ static void op_lwl(Mips * emu,uint32_t op) {
     uint32_t addr = (int32_t)getRs(emu,op)+c;
     uint32_t rtVal = getRt(emu,op);
     uint32_t wordVal = readVirtWord(emu,addr&(~3));
+    if(emu->exceptionOccured) {
+        return;
+    }
     uint32_t offset = addr % 4;
     uint32_t result;
 
@@ -423,6 +512,9 @@ static void op_sb(Mips * emu,uint32_t op) {
 static void op_lb(Mips * emu,uint32_t op) {
 	uint32_t addr = ((int32_t)getRs(emu,op) + (int16_t)getImm(op));
 	int8_t v = (int8_t)readVirtByte(emu,addr);
+	if(emu->exceptionOccured) {
+        return;
+    }
 	setRt(emu,op,(int32_t)v);
 }
 
@@ -445,6 +537,9 @@ static void op_beq(Mips * emu,uint32_t op) {
 static void op_lbu(Mips * emu,uint32_t op) {
 	uint32_t addr = ((int32_t)getRs(emu,op) + (int16_t)getImm(op));
 	uint32_t v = readVirtByte(emu,addr);
+	if(emu->exceptionOccured) {
+        return;
+    }
 	setRt(emu,op,v);
 }
 
@@ -455,6 +550,9 @@ static void op_lw(Mips * emu,uint32_t op) {
 	int16_t offset = getImm(op);
 	uint32_t addr = ((int32_t)getRs(emu,op) + offset);
 	uint32_t v = readVirtWord(emu,addr);
+	if(emu->exceptionOccured) {
+        return;
+    }
 	setRt(emu,op,v);
 }
 
@@ -477,6 +575,9 @@ static void op_sh(Mips * emu,uint32_t op) {
 	uint8_t vlo = getRt(emu,op)&0xff;
 	uint8_t vhi = (getRt(emu,op)&0xff00)>>8;
 	writeVirtByte(emu,addr,vhi);
+	if(emu->exceptionOccured) {
+        return;
+    }
 	writeVirtByte(emu,addr+1,vlo);
 }
 
@@ -538,6 +639,9 @@ static void op_swr(Mips * emu,uint32_t op) {
     uint32_t addr = (int32_t)getRs(emu,op)+c;
     uint32_t rtVal = getRt(emu,op);
     uint32_t wordVal = readVirtWord(emu,addr&(~3));
+    if(emu->exceptionOccured) {
+        return;
+    }
     uint32_t offset = addr&3;
     uint32_t result;
     
@@ -576,7 +680,13 @@ static void op_sw(Mips * emu,uint32_t op) {
 static void op_lh(Mips * emu,uint32_t op) {
 	uint32_t addr = (int32_t)getRs(emu,op) + (int16_t)getImm(op);
 	uint8_t vlo = readVirtByte(emu,addr+1);
+	if(emu->exceptionOccured) {
+        return;
+    }
 	uint8_t vhi = readVirtByte(emu,addr);
+	if(emu->exceptionOccured) {
+        return;
+    }
 	uint32_t v = (int32_t)(int16_t)((vhi<<8)| vlo);
 	setRt(emu,op,v);
 }
@@ -603,7 +713,13 @@ static void op_addi(Mips * emu,uint32_t op) {
 static void op_lhu(Mips * emu,uint32_t op) {
 	uint32_t addr = (int32_t)getRs(emu,op) + (int16_t)getImm(op);
 	uint8_t vlo = readVirtByte(emu,addr+1);
+	if(emu->exceptionOccured) {
+        return;
+    }
 	uint8_t vhi = readVirtByte(emu,addr);
+	if(emu->exceptionOccured) {
+        return;
+    }
 	uint32_t v = (vhi<<8)| vlo;
 	setRt(emu,op,v);
 }
@@ -642,6 +758,9 @@ static void op_lwr(Mips * emu,uint32_t op) {
     uint32_t addr = ((int32_t)getRs(emu,op))+c;
     uint32_t rtVal = getRt(emu,op);
     uint32_t wordVal = readVirtWord(emu,addr & (~3));
+    if(emu->exceptionOccured) {
+        return;
+    }
     uint32_t offset = addr & 3;
     uint32_t result;
     

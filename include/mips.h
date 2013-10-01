@@ -36,6 +36,7 @@ typedef struct {
     uint32_t lo;
     uint32_t delaypc;
     uint8_t inDelaySlot;
+    uint8_t exceptionOccured;
     
     uint32_t CP0_Index;
     uint32_t CP0_EntryHi;
@@ -43,6 +44,8 @@ typedef struct {
     uint32_t CP0_EntryLo1;
     uint32_t CP0_Wired;
     uint32_t CP0_Status;
+    uint32_t CP0_Epc;
+    uint32_t CP0_Cause;
     uint32_t CP0_PageMask;
     TLB tlb;
 } Mips;
