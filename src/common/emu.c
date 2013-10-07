@@ -105,7 +105,7 @@ static inline uint32_t getExceptionCode(Mips * emu) {
     return (emu->CP0_Cause >> 2) & 0x1f;
 }
 
-static inline uint32_t setExceptionCode(Mips * emu,int code) {
+static inline void setExceptionCode(Mips * emu,int code) {
     emu->CP0_Cause &= ~(0x1f << 2); // clear exccode
     emu->CP0_Cause |= (code & 0x1f) << 2; //set with new code
 }
@@ -118,9 +118,6 @@ static inline uint32_t setExceptionCode(Mips * emu,int code) {
 #define TLBRET_DIRTY 2
 #define TLBRET_INVALID 3
 
-//Accessing a phys address which doesnt exist
-#define BUS_ERROR 5
-#define UNALIGNED_ERROR 6
 
 // tlb code modified from qemu
 
@@ -279,7 +276,8 @@ static void writeVirtByte(Mips * emu, uint32_t addr,uint8_t val) {
     }
     
     if(paddr >= POWERBASE && paddr <= POWERBASE + POWERSIZE) {
-        exit(0);
+        emu->shutdown = 1;
+        return;
     }
     
     if (paddr >= emu->pmemsz) {
@@ -340,7 +338,11 @@ void handleException(Mips * emu,int inDelaySlot) {
 }
 
 void step_mips(Mips * emu) {
-
+    
+    if(emu->shutdown){
+        return;
+    }
+    
 	int startInDelaySlot = emu->inDelaySlot;
 	
 	
@@ -479,6 +481,21 @@ static void op_bne(Mips * emu,uint32_t op) {
 }
 
 
+static void op_bnel(Mips * emu,uint32_t op) {
+	int32_t offset = sext18(getImm(op) * 4);
+	if (getRs(emu,op) != getRt(emu,op) ) {
+		emu->pc = (int32_t)(emu->pc + 4) + offset;
+	} else {
+	    emu->pc += 4;
+	}
+}
+
+static void op_tne(Mips * emu,uint32_t op) {
+	if (getRs(emu,op) != getRt(emu,op) ) {
+		puts("unhandled trap!");
+		exit(1);
+	}
+}
 
 
 static void op_andi(Mips * emu,uint32_t op) {
@@ -531,8 +548,14 @@ static void op_beq(Mips * emu,uint32_t op) {
 	emu->inDelaySlot = 1;
 }
 
-
-
+static void op_beql(Mips * emu,uint32_t op) {
+	int32_t offset = sext18(getImm(op) * 4);
+	if (getRs(emu,op) == getRt(emu,op) ) {
+		emu->pc = (int32_t)(emu->pc + 4) + offset;
+	} else {
+		emu->pc = emu->pc += 4;
+	}
+}
 
 static void op_lbu(Mips * emu,uint32_t op) {
 	uint32_t addr = ((int32_t)getRs(emu,op) + (int16_t)getImm(op));
@@ -750,6 +773,15 @@ static void op_blez(Mips * emu,uint32_t op) {
 	emu->inDelaySlot = 1;
 }
 
+static void op_blezl(Mips * emu,uint32_t op) {
+	int32_t offset = sext18(getImm(op) * 4);
+	if (((int32_t)getRs(emu,op)) <= 0) {
+		emu->pc = (int32_t)(emu->pc + 4) + offset;
+	} else {
+		emu->pc += 4;
+	}
+}
+
 
 
 
@@ -855,7 +887,11 @@ static void op_mtc0(Mips * emu,uint32_t op) {
         case 3: // EntryLo1
             emu->CP0_EntryLo1 = rt & (0x3fffffff);
             break;
-            
+        
+        case 4: // Context
+            emu->CP0_Context = rt & (0xff8);
+            break;
+         
         case 5: // Page Mask
             if(sel != 0) {
                 goto unhandled;
@@ -1132,7 +1168,14 @@ static void op_bgez(Mips * emu,uint32_t op) {
 	emu->inDelaySlot = 1;
 }
 
-
+static void op_bgezl(Mips * emu,uint32_t op) {
+	int32_t offset = sext18(getImm(op) * 4);
+	if (((int32_t)getRs(emu,op)) >= 0) {
+		emu->pc = (int32_t)(emu->pc + 4) + offset;
+	} else {
+		emu->pc += 4;
+	}
+}
 
 
 static void op_bltz(Mips * emu,uint32_t op) {
@@ -1145,8 +1188,17 @@ static void op_bltz(Mips * emu,uint32_t op) {
 	emu->inDelaySlot = 1;
 }
 
+static void op_bltzl(Mips * emu,uint32_t op) {
+	int32_t offset = sext18(getImm(op) * 4);
+	if (((int32_t)getRs(emu,op)) < 0) {
+		emu->pc = (int32_t)(emu->pc + 4) + offset;
+	} else {
+		emu->pc += 4;
+	}
+}
 
 
-#include "gen/doop.c"
+
+#include "./gen/doop.gen.c"
 
 

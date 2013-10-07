@@ -42,6 +42,7 @@ typedef struct {
     uint32_t CP0_EntryHi;
     uint32_t CP0_EntryLo0;
     uint32_t CP0_EntryLo1;
+    uint32_t CP0_Context;
     uint32_t CP0_Wired;
     uint32_t CP0_Status;
     uint32_t CP0_Epc;
@@ -63,6 +64,7 @@ typedef struct {
 
 int loadSrec_mips(Mips * emu,SrecLoader * s);
 int loadSrecFromFile_mips(Mips * emu,char * fname);
+int loadSrecFromString_mips(Mips * emu,char * srec);
 
 typedef struct {
     FILE * file;

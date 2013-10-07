@@ -1,15 +1,21 @@
-all: emu 
+.PHONY: all clean jsemu
 
-emu: ./src/*.c ./include/*.h ./src/gen/doop.c
-	gcc -O2 -I./include/ ./src/*.c -o emu
+all: emu jsemu
 
-ememu.js: ./src/*.c ./include/*.h ./src/gen/doop.c
-	emcc -s TOTAL_MEMORY=134217728 -O2 -I./include/ ./src/*.c -o ememu.js
+emu: ./src/common/*.c ./src/desktop/*.c ./src/common/gen/doop.gen.c ./include/*.h 
+	gcc -O3 -I./include/ ./src/common/*.c ./src/desktop/*.c -o emu
 
-./src/gen/doop.c: ./disgen/*.py ./disgen/mips.json
-	mkdir -p ./src/gen
-	python ./disgen/disgen.py ./disgen/cdisgen.py ./disgen/mips.json > ./src/gen/doop.c
+
+jsemu: ./src/web/ememu.js
+
+./src/web/ememu.js: ./src/common/*.c ./include/*.h ./src/common/gen/doop.gen.c
+	emcc -s EXPORTED_FUNCTIONS="['_new_mips','_free_mips','_step_mips','_loadSrecFromString_mips']" -s TOTAL_MEMORY=134217728 -O2 -I./include/ ./src/common/*.c -o ./src/web/ememu.js
+
+./src/common/gen/doop.gen.c: ./disgen/*.py ./disgen/mips.json
+	mkdir -p ./src/common/gen/
+	python ./disgen/disgen.py ./disgen/cdisgen.py ./disgen/mips.json > ./src/common/gen/doop.gen.c
 
 clean:
-	rm -vrf ./src/gen/
+	rm -vf ./src/web/ememu.js
+	rm -vf ./src/common/gen/doop.gen.c
 	rm -fv ./emu

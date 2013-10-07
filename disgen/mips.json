@@ -32,6 +32,14 @@
       "000100xxxxxxxxxxxxxxxxxxxxxxxxxx"
    ],
    [
+      "beql",
+      "010100xxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+      "tne",
+      "000000xxxxxxxxxxxxxxxxxxxx110110"
+   ],
+   [
       "bne",
       "000101xxxxxxxxxxxxxxxxxxxxxxxxxx"
    ],
@@ -40,12 +48,28 @@
       "000110xxxxxxxxxxxxxxxxxxxxxxxxxx"
    ],
    [
+      "blezl",
+      "010110xxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+      "bnel",
+      "010101xxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
       "bgez",
       "000001xxxxx00001xxxxxxxxxxxxxxxx"
    ],
    [
+      "bgezl",
+      "000001xxxxx00011xxxxxxxxxxxxxxxx"
+   ],
+   [
       "bltz",
       "000001xxxxx00000xxxxxxxxxxxxxxxx"
+   ],
+   [
+      "bltzl",
+      "000001xxxxx00010xxxxxxxxxxxxxxxx"
    ],
    [
       "bgtz",

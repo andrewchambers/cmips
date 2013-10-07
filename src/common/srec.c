@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 
-static int nextChar(void * ud) {
+static int fnextChar(void * ud) {
     int c = fgetc((FILE*)ud);
     if(c == EOF) {
         return -1;
@@ -12,7 +12,7 @@ static int nextChar(void * ud) {
     return c;
 }
 
-static int isEof(void * ud) {
+static int fisEof(void * ud) {
     return feof((FILE*)ud);
 }
 
@@ -22,19 +22,44 @@ int loadSrecFromFile_mips(Mips * emu,char * fname) {
     void * ud = fopen(fname,"r");
     
     if(!ud) {
-        fprintf(stderr,"srec %s failed to open",fname);
+        fprintf(stdout,"srec %s failed to open",fname);
         return 1;
     }
     
     SrecLoader loader;
-    loader.nextChar = &nextChar;
-    loader.isEof = &isEof;
+    loader.nextChar = &fnextChar;
+    loader.isEof = &fisEof;
     loader.userdata = ud;
     int ret = loadSrec_mips(emu,&loader);
     fclose((FILE*)ud);
     return ret;
 }
 
+
+static int snextChar(void * ud) {
+    int c = **(char**)ud;
+    (*(char**)ud)++;
+    if(c == 0) {
+        return -1;
+    }
+    return c;
+}
+
+static int sisEof(void * ud) {
+    return (**(char**)ud) == 0;
+}
+
+int loadSrecFromString_mips(Mips * emu,char * srec) {
+    
+    void * ud = (void*)&srec;
+    
+    SrecLoader loader;
+    loader.nextChar = &snextChar;
+    loader.isEof = &sisEof;
+    loader.userdata = ud;
+    int ret = loadSrec_mips(emu,&loader);
+    return ret;
+}
 
 
 //a minimized version of address translation which checks fixed map ranges
@@ -153,26 +178,26 @@ int loadSrec_mips(Mips * emu, SrecLoader * loader)
                 break;
             case 3:
                 if(srecReadByte(loader,&count)){
-                    fputs("srecLoader: failed to parse bytecount.\n",stderr);
+                    fputs("srecLoader: failed to parse bytecount.\n",stdout);
                     return 1;
                 }
                 if(srecReadAddress(loader,&addr)){
-                    fputs("srecLoader: failed to parse address.\n",stderr);
+                    fputs("srecLoader: failed to parse address.\n",stdout);
                     return 1;
                 }
                 if(srecLoadData(loader,emu,addr,count-5)){
-                    fputs("srecLoader: failed to load data.\n",stderr);
+                    fputs("srecLoader: failed to load data.\n",stdout);
                     return 1;
                 }
                 srecSkipToNextLine(loader);
                 break;
             case 7:
                 if(srecReadByte(loader,&count)){
-                    fputs("srecLoader: failed to parse bytecount.\n",stderr);
+                    fputs("srecLoader: failed to parse bytecount.\n",stdout);
                     return 1;
                 }
                 if(srecReadAddress(loader,&addr)){
-                    fputs("srecLoader: failed to parse address.\n",stderr);
+                    fputs("srecLoader: failed to parse address.\n",stdout);
                     return 1;
                 }
                 emu->pc = addr;
@@ -180,7 +205,7 @@ int loadSrec_mips(Mips * emu, SrecLoader * loader)
                 break;
 
             default:
-                fputs("Bad/Unsupported srec type\n",stderr);
+                fputs("Bad/Unsupported srec type\n",stdout);
                 return 1;
         }
     }
