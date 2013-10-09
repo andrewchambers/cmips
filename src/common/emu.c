@@ -799,11 +799,11 @@ static void op_lwr(Mips * emu,uint32_t op) {
     switch (offset) {
         case 3:
             result = wordVal;
-        break;
+            break;
         
         case 2:
             result = ((rtVal & 0xff000000) | (wordVal >> 8));
-        break;
+            break;
         
         case 1:
             result = ((rtVal & 0xffff0000) | (wordVal >> 16));
