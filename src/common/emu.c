@@ -551,7 +551,8 @@ static void op_beq(Mips * emu,uint32_t op) {
 static void op_beql(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
 	if (getRs(emu,op) == getRt(emu,op) ) {
-		emu->pc = (int32_t)(emu->pc + 4) + offset;
+		emu->delaypc = (int32_t)(emu->pc + 4) + offset;
+		emu->inDelaySlot = 1;
 	} else {
 		emu->pc = emu->pc += 4;
 	}
@@ -1171,7 +1172,8 @@ static void op_bgez(Mips * emu,uint32_t op) {
 static void op_bgezl(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
 	if (((int32_t)getRs(emu,op)) >= 0) {
-		emu->pc = (int32_t)(emu->pc + 4) + offset;
+		emu->delaypc = (int32_t)(emu->pc + 4) + offset;
+		emu->inDelaySlot = 1;
 	} else {
 		emu->pc += 4;
 	}

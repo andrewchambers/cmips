@@ -1,11 +1,11 @@
 .PHONY: all clean jsemu
 
-all: emu jsemu
+all: emu
 
 emu: ./src/common/*.c ./src/desktop/*.c ./src/common/gen/doop.gen.c ./include/*.h 
 	gcc -O3 -I./include/ ./src/common/*.c ./src/desktop/*.c -o emu
 
-
+#currently disabled
 jsemu: ./src/web/ememu.js
 
 ./src/web/ememu.js: ./src/common/*.c ./include/*.h ./src/common/gen/doop.gen.c
