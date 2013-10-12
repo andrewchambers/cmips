@@ -76,6 +76,10 @@
       "000111xxxxxxxxxxxxxxxxxxxxxxxxxx"
    ],
    [
+      "bgtzl",
+      "010111xxxxx00000xxxxxxxxxxxxxxxx"
+   ],
+   [
       "div",
       "000000xxxxxxxxxxxxxxxxxxxx011010"
    ],

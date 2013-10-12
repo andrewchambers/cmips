@@ -205,7 +205,7 @@ static uint32_t readVirtWord(Mips * emu, uint32_t addr) {
     }
     
     if (paddr >= emu->pmemsz) {
-        puts("unhandled bus error");
+        printf("unhandled bus error paddr: %08x\n",paddr);
         exit(1);
     }
     
@@ -230,7 +230,7 @@ static void writeVirtWord(Mips * emu, uint32_t addr,uint32_t val) {
     }
     
     if (paddr >= emu->pmemsz) {
-        puts("unhandled bus error");
+        printf("unhandled bus error paddr: %08x\n",paddr);
         exit(1);
     }
     
@@ -251,7 +251,7 @@ static uint8_t readVirtByte(Mips * emu, uint32_t addr) {
     unsigned int offset = paddr&3;
     
     if (paddr >= emu->pmemsz) {
-        puts("unhandled bus error");
+        printf("unhandled bus error paddr: %08x\n",paddr);
         exit(1);
     }
     
@@ -281,7 +281,7 @@ static void writeVirtByte(Mips * emu, uint32_t addr,uint8_t val) {
     }
     
     if (paddr >= emu->pmemsz) {
-        puts("unhandled bus error");
+        printf("unhandled bus error paddr: %08x\n",paddr);
         exit(1);
     }
 	
@@ -484,7 +484,8 @@ static void op_bne(Mips * emu,uint32_t op) {
 static void op_bnel(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
 	if (getRs(emu,op) != getRt(emu,op) ) {
-		emu->pc = (int32_t)(emu->pc + 4) + offset;
+		emu->delaypc = (int32_t)(emu->pc + 4) + offset;
+		emu->inDelaySlot = 1;
 	} else {
 	    emu->pc += 4;
 	}
@@ -610,7 +611,7 @@ static void op_sh(Mips * emu,uint32_t op) {
 
 static void op_slti(Mips * emu,uint32_t op) {
     int32_t rs = getRs(emu,op);
-    int16_t c = getImm(op);
+    int32_t c = (int16_t)getImm(op);
     if ( rs < c ) { 
         setRt(emu,op,1);
     } else {
@@ -623,7 +624,7 @@ static void op_slti(Mips * emu,uint32_t op) {
 
 static void op_sltiu(Mips * emu,uint32_t op) {
     uint32_t rs = getRs(emu,op);
-    uint32_t c = (uint32_t)(int16_t)getImm(op);
+    uint32_t c = (uint32_t)(int32_t)(int16_t)getImm(op);
     if ( rs < c ) { 
         setRt(emu,op,1);
     } else {
@@ -761,6 +762,16 @@ static void op_bgtz(Mips * emu,uint32_t op) {
 	emu->inDelaySlot = 1;
 }
 
+static void op_bgtzl(Mips * emu,uint32_t op) {
+	int32_t offset = sext18(getImm(op) * 4);
+	if (((int32_t)getRs(emu,op)) > 0) {
+		emu->delaypc = (int32_t)(emu->pc + 4) + offset;
+		emu->inDelaySlot = 1;
+	} else {
+		emu->pc += 4;
+	}
+	
+}
 
 
 
@@ -777,7 +788,8 @@ static void op_blez(Mips * emu,uint32_t op) {
 static void op_blezl(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
 	if (((int32_t)getRs(emu,op)) <= 0) {
-		emu->pc = (int32_t)(emu->pc + 4) + offset;
+		emu->delaypc = (int32_t)(emu->pc + 4) + offset;
+		emu->inDelaySlot = 1;
 	} else {
 		emu->pc += 4;
 	}
@@ -857,7 +869,12 @@ static void op_mfc0(Mips * emu,uint32_t op) {
             }
             retval = emu->CP0_Status;
             break;
-        
+        case 15:
+            retval = 0x00018000; //processor id, just copied qemu 4kc
+            break;
+        case 16:
+            retval = 0x80008082; // XXX cacheability fields shouldnt be hardcoded as writeable
+            break;
         default:
             unhandled:
             printf("unhandled cp0 reg selector in mfc0 %d %d\n",regNum,sel);
@@ -1011,8 +1028,7 @@ static void op_subu(Mips * emu,uint32_t op) {
 
 
 static void op_sub(Mips * emu,uint32_t op) {
-    printf("unimplemented opcode op_sub %08x at pc %08x\n",op,emu->pc);
-    exit(1);
+    setRd(emu,op,getRs(emu,op) -  getRt(emu,op));
 }
 
 
@@ -1193,7 +1209,8 @@ static void op_bltz(Mips * emu,uint32_t op) {
 static void op_bltzl(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
 	if (((int32_t)getRs(emu,op)) < 0) {
-		emu->pc = (int32_t)(emu->pc + 4) + offset;
+		emu->delaypc = (int32_t)(emu->pc + 4) + offset;
+		emu->inDelaySlot = 1;
 	} else {
 		emu->pc += 4;
 	}
