@@ -116,6 +116,22 @@
       "100101xxxxxxxxxxxxxxxxxxxxxxxxxx"
    ],
    [
+      "ll",
+      "110000xxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+       "cache",
+       "101111xxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+       "pref",
+       "110011xxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+      "sc",
+      "111000xxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
       "lwl",
       "100010xxxxxxxxxxxxxxxxxxxxxxxxxx"
    ],

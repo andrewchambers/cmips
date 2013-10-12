@@ -855,26 +855,68 @@ static void op_mfc0(Mips * emu,uint32_t op) {
             }
             retval = emu->CP0_PageMask;
             break;
+
+        case 6: // Wired
+            if(sel != 0) {
+                goto unhandled;
+            }
+            retval = emu->CP0_Wired;
+            break;
         
+        case 9: // Count
+            if(sel != 0) {
+                goto unhandled;
+            }
+            retval = emu->CP0_Count;
+            break;
+            
         case 10: // EntryHi
             if (sel != 0 ) {
                 goto unhandled;
             }
             retval = emu->CP0_EntryHi;
             break;
-        
+
+        case 11: // Compare
+            if(sel != 0) {
+                goto unhandled;
+            }
+            retval = emu->CP0_Compare;
+            break;
+
         case 12: // Status
             if (sel != 0 ) {
                 goto unhandled;
             }
             retval = emu->CP0_Status;
             break;
+        
+        case 13:
+            if (sel != 0 ) {
+                goto unhandled;
+            }
+            retval = emu->CP0_Cause;
+            break;
+        
         case 15:
             retval = 0x00018000; //processor id, just copied qemu 4kc
             break;
         case 16:
-            retval = 0x80008082; // XXX cacheability fields shouldnt be hardcoded as writeable
+            if (sel == 0) {
+                retval = 0x80008082; // XXX cacheability fields shouldnt be hardcoded as writeable
+                break;
+            }
+            if (sel == 1) {
+                retval = 0x1e190c8a;
+                break;
+            }
+            goto unhandled;
+        
+        case 18:
+        case 19:
+            retval = 0;
             break;
+        
         default:
             unhandled:
             printf("unhandled cp0 reg selector in mfc0 %d %d\n",regNum,sel);
@@ -922,13 +964,35 @@ static void op_mtc0(Mips * emu,uint32_t op) {
             emu->CP0_PageMask = rt & 0x1ffe000;
             break;
 
+        case 6: // Wired
+            if(sel != 0) {
+                goto unhandled;
+            }
+            emu->CP0_Wired = rt & 0xf;
+            break;
+
+        case 9: // Count
+            if(sel != 0) {
+                goto unhandled;
+            }
+            emu->CP0_Count = rt;
+            break;
+
+
         case 10: // EntryHi
             if (sel != 0 ) {
                 goto unhandled;
             }
             emu->CP0_EntryHi = rt & (~0x1f00);
             break;
-            
+        
+        case 11: // Compare
+            if(sel != 0) {
+                goto unhandled;
+            }
+            emu->CP0_Compare = rt;
+            break;
+       
         case 12: // Status
             if (sel != 0 ) {
                 goto unhandled;
@@ -937,6 +1001,16 @@ static void op_mtc0(Mips * emu,uint32_t op) {
             //XXX clear the read only registers
             //NMI is one way write
             break;
+        
+        case 13:
+            break;
+        
+        case 16:
+            break;
+        
+        case 18:
+        case 19:
+            break;
                 
         default:
             unhandled:
@@ -944,6 +1018,14 @@ static void op_mtc0(Mips * emu,uint32_t op) {
             exit(1);
     }
     
+}
+
+static void op_cache(Mips * emu, uint32_t op) {
+    /* noop? */
+}
+
+static void op_pref(Mips * emu, uint32_t op) {
+    /* noop? */
 }
 
 static void op_tlbwi(Mips * emu, uint32_t op) {
@@ -1046,6 +1128,26 @@ static void op_add(Mips * emu,uint32_t op) {
 }
 
 
+static void op_ll(Mips * emu,uint32_t op) {
+	int16_t offset = getImm(op);
+	uint32_t addr = ((int32_t)getRs(emu,op) + offset);
+	uint32_t v = readVirtWord(emu,addr);
+	if(emu->exceptionOccured) {
+        return;
+    }
+    emu->llbit = 1;
+	setRt(emu,op,v);
+}
+
+static void op_sc(Mips * emu,uint32_t op) {
+	int16_t offset = getImm(op);
+	uint32_t addr = ((int32_t)getRs(emu,op) + offset);
+	if(emu->llbit) {
+	    writeVirtWord(emu,addr,getRt(emu,op));
+	}
+	setRt(emu,op,emu->llbit);
+	
+}
 
 
 static void op_divu(Mips * emu,uint32_t op) {
@@ -1089,7 +1191,7 @@ static void op_multu(Mips * emu,uint32_t op) {
 
 
 static void op_mult(Mips * emu,uint32_t op) {
-    int64_t result = (int64_t)getRs(emu,op) * (int64_t)getRt(emu,op);
+    int64_t result = (int64_t)(int32_t)getRs(emu,op) * (int64_t)(int32_t)getRt(emu,op);
     emu->hi = result >> 32;
     emu->lo = result & 0xffffffff;    
 }
