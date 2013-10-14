@@ -143,7 +143,7 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
             if (!(n ? tlb_e->V1 : tlb_e->V0)) {
                 //printf("invalid %d %d\n",tlb_e->V1,tlb_e->V0);
                 emu->exceptionOccured = 1;
-                setExceptionCode(0,write ? EXC_TLBS : EXC_TLBL);
+                setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
                 return TLBRET_INVALID;
             }
             if (write == 0 || (n ? tlb_e->D1 : tlb_e->D0)) {
@@ -152,12 +152,12 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
                 return TLBRET_MATCH;
             }
             emu->exceptionOccured = 1;
-            setExceptionCode(0,write ? EXC_TLBS : EXC_TLBL);
+            setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
             return TLBRET_DIRTY;
         }
     }
     emu->exceptionOccured = 1;
-    setExceptionCode(0,write ? EXC_TLBS : EXC_TLBL);
+    setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
     return TLBRET_NOMATCH;
 }
 
@@ -296,9 +296,7 @@ static void writeVirtByte(Mips * emu, uint32_t addr,uint8_t val) {
 	emu->mem[baseaddr/4] = word;
 }
 
-
-
-void handleException(Mips * emu,int inDelaySlot) {
+static void handleException(Mips * emu,int inDelaySlot) {
 
     uint32_t offset;
     int exccode = getExceptionCode(emu);
@@ -337,11 +335,55 @@ void handleException(Mips * emu,int inDelaySlot) {
 
 }
 
+static void triggerExternalInterrupt(Mips * emu,unsigned int intNum) {
+    emu->CP0_Cause |= ((1 << intNum) & 0x3f ) << 9;     
+}
+
+static void clearExternalInterrupt(Mips * emu,unsigned int intNum) {
+    emu->CP0_Cause &= ~(((1 << intNum) & 0x3f ) << 9);     
+}
+
+/* return 1 if interrupt occured else 0*/
+static int handleInterrupts(Mips * emu) {
+    
+    //if interrupts disabled or ERL or EXL set
+    if((emu->CP0_Status & 1) == 0 || (emu->CP0_Status & ((1 << 1) | (1 << 2))) ) {
+        return 0; // interrupts disabled
+    }
+    
+    if((emu->CP0_Cause & emu->CP0_Status &  0xfc00) == 0) {
+        return 0; // no pending interrupts
+    }
+    
+    
+    setExceptionCode(emu,0);
+    handleException(emu,emu->inDelaySlot);
+    
+    return 1;
+    
+}
+
+
 void step_mips(Mips * emu) {
     
     if(emu->shutdown){
         return;
     }
+    
+    /* timer code */
+    if( (emu->CP0_Status & 1) && (emu->CP0_Count < emu->CP0_Compare) ) {
+        //probably not really right, but only do this if interrupts are enabled to save time.
+        triggerExternalInterrupt(emu,5); // 5 is the timer int :)
+    }
+    
+    emu->CP0_Count++;
+    
+    if(handleInterrupts(emu)) {
+        return;
+    }
+    
+    /* end timer code */
+    
     
 	int startInDelaySlot = emu->inDelaySlot;
 	
@@ -349,6 +391,7 @@ void step_mips(Mips * emu) {
 	uint32_t opcode = readVirtWord(emu,emu->pc);
 	
 	if(emu->exceptionOccured) { //instruction fetch failed
+	    printf("exception!!!!!!! pc: %08x\n",emu->pc);
 	    handleException(emu,startInDelaySlot);
 	    return;
 	}
@@ -358,6 +401,7 @@ void step_mips(Mips * emu) {
     emu->regs[0] = 0;
     
 	if(emu->exceptionOccured) { //instruction failed
+	    puts("exception2!!!!!!!");
 	    handleException(emu,startInDelaySlot);
 	    return;
 	}
@@ -881,6 +925,7 @@ static void op_mfc0(Mips * emu,uint32_t op) {
             if(sel != 0) {
                 goto unhandled;
             }
+            clearExternalInterrupt(emu,5);
             retval = emu->CP0_Compare;
             break;
 
@@ -1026,6 +1071,23 @@ static void op_cache(Mips * emu, uint32_t op) {
 
 static void op_pref(Mips * emu, uint32_t op) {
     /* noop? */
+}
+
+static void op_eret(Mips * emu, uint32_t op) {
+    
+    if(emu->inDelaySlot){
+        return;
+    }
+    
+    emu->llbit = 0;
+    
+    if(emu->CP0_Status & (1 << 2)) { //if ERL is set
+        emu->CP0_Status &= ~(1 << 2); //clear ERL;
+        emu->pc = emu->CP0_ErrorEpc;
+    } else {
+        emu->pc = emu->CP0_Epc;
+        emu->CP0_Status &= ~(1 << 1); //clear EXL;
+    }
 }
 
 static void op_tlbwi(Mips * emu, uint32_t op) {
@@ -1196,7 +1258,23 @@ static void op_mult(Mips * emu,uint32_t op) {
     emu->lo = result & 0xffffffff;    
 }
 
+static void op_movz(Mips * emu,uint32_t op) {
+    if(getRt(emu,op) == 0) {
+        setRd(emu,op,getRs(emu,op));
+    }
+}
 
+static void op_movn(Mips * emu,uint32_t op) {
+    if(getRt(emu,op) != 0) {
+        setRd(emu,op,getRs(emu,op));
+    }
+}
+
+
+static void op_mul(Mips * emu,uint32_t op) {
+    int32_t result = (int32_t)getRs(emu,op) * (int32_t)getRt(emu,op);
+    setRd(emu,op,result);
+}
 
 
 static void op_mflo(Mips * emu,uint32_t op) {

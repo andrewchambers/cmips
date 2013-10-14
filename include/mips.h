@@ -47,6 +47,7 @@ typedef struct {
     uint32_t CP0_Wired;
     uint32_t CP0_Status;
     uint32_t CP0_Epc;
+    uint32_t CP0_ErrorEpc;
     uint32_t CP0_Cause;
     uint32_t CP0_PageMask;
     
