@@ -1049,6 +1049,9 @@ static void op_mtc0(Mips * emu,uint32_t op) {
             break;
         
         case 13: //cause
+            if(sel != 0) {
+                goto unhandled;
+            }
             uint32_t cause_mask = ((1 << 23) | (1 << 22) | (3 << 8));
             emu->CP0_Cause = (emu->CP0_Cause & ~cause_mask ) | (rt & cause_mask);
             break;
