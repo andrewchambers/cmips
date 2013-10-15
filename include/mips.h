@@ -38,6 +38,7 @@ typedef struct {
     uint8_t inDelaySlot;
     uint8_t exceptionOccured;
     
+    
     int llbit;
     uint32_t CP0_Index;
     uint32_t CP0_EntryHi;

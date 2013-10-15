@@ -997,9 +997,9 @@ static void op_mtc0(Mips * emu,uint32_t op) {
             if (sel != 0 ) {
                 goto unhandled;
             }
-            emu->CP0_Status = rt;
-            //XXX clear the read only registers
-            //NMI is one way write
+            uint32_t status_mask = 0x7d7cff17;
+            emu->CP0_Status =  (emu->CP0_Status & ~status_mask ) | (rt & status_mask); //mask out read only
+            //XXX NMI is one way write
             break;
         
         case 13:
