@@ -36,6 +36,10 @@
       "010100xxxxxxxxxxxxxxxxxxxxxxxxxx"
    ],
    [
+      "eret",
+      "01000010000000000000000000011000"
+   ],
+   [
       "tne",
       "000000xxxxxxxxxxxxxxxxxxxx110110"
    ],
@@ -174,6 +178,18 @@
    [
       "mtc0",
       "01000000100xxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+      "mul",
+      "011100xxxxxxxxxxxxxxx00000000010"
+   ],
+   [
+      "movz",
+      "000000xxxxxxxxxxxxxxx00000001010"
+   ],
+   [
+      "movn",
+      "000000xxxxxxxxxxxxxxx00000001011"
    ],
    [
       "mult",

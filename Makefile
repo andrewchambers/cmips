@@ -3,7 +3,7 @@
 all: emu
 
 emu: ./src/common/*.c ./src/desktop/*.c ./src/common/gen/doop.gen.c ./include/*.h 
-	gcc -O3 -I./include/ ./src/common/*.c ./src/desktop/*.c -o emu
+	gcc -O0 -g -I./include/ ./src/common/*.c ./src/desktop/*.c -o emu
 
 #currently disabled
 jsemu: ./src/web/ememu.js
