@@ -336,11 +336,11 @@ static void handleException(Mips * emu,int inDelaySlot) {
 }
 
 static void triggerExternalInterrupt(Mips * emu,unsigned int intNum) {
-    emu->CP0_Cause |= ((1 << intNum) & 0x3f ) << 9;     
+    emu->CP0_Cause |= ((1 << intNum) & 0x3f ) << 10;     
 }
 
 static void clearExternalInterrupt(Mips * emu,unsigned int intNum) {
-    emu->CP0_Cause &= ~(((1 << intNum) & 0x3f ) << 9);     
+    emu->CP0_Cause &= ~(((1 << intNum) & 0x3f ) << 10);     
 }
 
 /* return 1 if interrupt occured else 0*/
@@ -371,7 +371,7 @@ void step_mips(Mips * emu) {
     }
     
     /* timer code */
-    if( (emu->CP0_Status & 1) && (emu->CP0_Count < emu->CP0_Compare) ) {
+    if( (emu->CP0_Status & 1) && (emu->CP0_Count > emu->CP0_Compare) ) {
         //probably not really right, but only do this if interrupts are enabled to save time.
         triggerExternalInterrupt(emu,5); // 5 is the timer int :)
     }
@@ -392,6 +392,7 @@ void step_mips(Mips * emu) {
 	
 	if(emu->exceptionOccured) { //instruction fetch failed
 	    printf("exception!!!!!!! pc: %08x\n",emu->pc);
+	    exit(1);
 	    handleException(emu,startInDelaySlot);
 	    return;
 	}
@@ -402,6 +403,7 @@ void step_mips(Mips * emu) {
     
 	if(emu->exceptionOccured) { //instruction failed
 	    puts("exception2!!!!!!!");
+	    exit(1);
 	    handleException(emu,startInDelaySlot);
 	    return;
 	}
