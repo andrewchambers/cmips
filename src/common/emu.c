@@ -355,7 +355,6 @@ static int handleInterrupts(Mips * emu) {
         return 0; // no pending interrupts
     }
     
-    
     setExceptionCode(emu,0);
     handleException(emu,emu->inDelaySlot);
     
@@ -366,13 +365,14 @@ static int handleInterrupts(Mips * emu) {
 
 void step_mips(Mips * emu) {
     
-    if(emu->shutdown){
+    if (emu->shutdown){
         return;
     }
     
     /* timer code */
-    if( (emu->CP0_Status & 1) && (emu->CP0_Count > emu->CP0_Compare) ) {
-        //probably not really right, but only do this if interrupts are enabled to save time.
+    if ( (emu->CP0_Status & 1) && (emu->CP0_Count > emu->CP0_Compare) ) {
+        // probably not really right,
+        // but only do this if interrupts are enabled to save time.
         triggerExternalInterrupt(emu,5); // 5 is the timer int :)
     }
     
@@ -1090,6 +1090,7 @@ static void op_eret(Mips * emu, uint32_t op) {
         emu->pc = emu->CP0_Epc;
         emu->CP0_Status &= ~(1 << 1); //clear EXL;
     }
+    emu->pc -= 4; //counteract typical pc += 4
 }
 
 static void op_tlbwi(Mips * emu, uint32_t op) {
