@@ -985,18 +985,18 @@ static void op_mtc0(Mips * emu,uint32_t op) {
                goto unhandled; 
             }
             
-            emu->CP0_Index = rt & 0xf;
+            emu->CP0_Index = (emu->CP0_Index & 0x80000000 ) | (rt & 0xf);
             break;
         case 2: // EntryLo0
-            emu->CP0_EntryLo0 = rt & (0x3fffffff);
+            emu->CP0_EntryLo0 = (rt & 0x3ffffff);
             break;
             
         case 3: // EntryLo1
-            emu->CP0_EntryLo1 = rt & (0x3fffffff);
+            emu->CP0_EntryLo1 = (rt & 0x3ffffff);
             break;
         
         case 4: // Context
-            emu->CP0_Context = rt & (0xff8);
+            emu->CP0_Context &= (emu->CP0_Context & ~0xff800000 ) | (rt & 0xff800000 );
             break;
          
         case 5: // Page Mask
@@ -1025,7 +1025,6 @@ static void op_mtc0(Mips * emu,uint32_t op) {
             emu->CP0_Count = rt;
             break;
 
-
         case 10: // EntryHi
             if (sel != 0 ) {
                 goto unhandled;
@@ -1045,11 +1044,13 @@ static void op_mtc0(Mips * emu,uint32_t op) {
                 goto unhandled;
             }
             uint32_t status_mask = 0x7d7cff17;
-            emu->CP0_Status =  (emu->CP0_Status & ~status_mask ) | (rt & status_mask); //mask out read only
+            emu->CP0_Status =  (emu->CP0_Status & ~status_mask ) | (rt & status_mask);
             //XXX NMI is one way write
             break;
         
-        case 13:
+        case 13: //cause
+            uint32_t cause_mask = ((1 << 23) | (1 << 22) | (3 << 8));
+            emu->CP0_Cause = (emu->CP0_Cause & ~cause_mask ) | (rt & cause_mask);
             break;
         
         case 16:
