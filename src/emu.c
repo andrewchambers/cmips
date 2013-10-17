@@ -21,6 +21,7 @@
 #define CP0St_KX    7
 #define CP0St_SX    6
 #define CP0St_UX    5
+#define CP0St_UM    4
 #define CP0St_KSU   3
 #define CP0St_ERL   2
 #define CP0St_EXL   1
@@ -111,6 +112,15 @@ static inline void setExceptionCode(Mips * emu,int code) {
 }
 
 
+static inline uint32_t isKernelMode(Mips * emu) {
+    
+    if (emu->CP0_Status & (1 << CP0St_UM)) {
+        return 0;
+    }    
+    
+    return emu->CP0_Status & ((1 << CP0St_EXL) | (1 << CP0St_ERL));
+}
+
 //tlb lookup return codes
 
 #define TLBRET_MATCH 0
@@ -119,8 +129,58 @@ static inline void setExceptionCode(Mips * emu,int code) {
 #define TLBRET_INVALID 3
 
 
-// tlb code modified from qemu
 
+
+
+// return a random uniformly distributed number
+// this function is used by tlbw and the random register
+// between the inclusive range. popular misconception 
+// is that modulo min + rand % range is uniform.
+//XXX make more deterministic so emulators can go in lockstep
+static uint32_t randomInRange(uint32_t a,uint32_t b) {
+    
+    uint32_t v;
+    uint32_t range;
+    uint32_t upper;
+    uint32_t lower;
+    uint32_t mask;
+    
+    if(a == b) {
+        return a;
+    }
+    
+    if(a > b) {
+        upper = a;
+        lower = b;
+    } else {
+        upper = b;
+        lower = a; 
+    }
+    
+    range = upper - lower;
+    
+    mask = 0;
+    //XXX calculate range with log and mask? nah, too lazy :).
+    while(1) {
+        if(mask >= range) {
+            break;
+        }
+        mask = (mask << 1) | 1;
+    }
+    
+    
+    while(1) {
+        v = rand() & mask;
+        if(v <= range) {
+            return lower + v;
+        }
+    }
+    
+}
+
+
+
+// tlb code modified from qemu
 
 static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int write) {
     uint8_t ASID = emu->CP0_EntryHi & 0xFF;
@@ -165,7 +225,7 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
 //returns an error code
 static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_out,int write) {
     
-    if (vaddr <= (int32_t)0x7FFFFFFFUL) {
+    if (vaddr <= 0x7FFFFFFF) {
         /* useg */
         if (emu->CP0_Status & (1 << CP0St_ERL)) {
             *paddr_out = vaddr;
@@ -179,10 +239,18 @@ static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_ou
     } else if ( vaddr >= 0xa0000000 && vaddr <= 0xbfffffff ) {
         *paddr_out = vaddr - 0xa0000000;
         return 0;
-    } else {
-        *paddr_out = vaddr;
-        return 0;
+    } else { //kseg2 and 3
+        if(isKernelMode(emu)) {
+            return tlb_lookup(emu,vaddr,paddr_out, write);
+        } else {
+            *paddr_out = vaddr;
+            return 1;
+        }
+        
     }
+    
+    puts("unreachable.");
+    return 1;
     
 }
 
@@ -205,7 +273,7 @@ static uint32_t readVirtWord(Mips * emu, uint32_t addr) {
     }
     
     if (paddr >= emu->pmemsz) {
-        printf("unhandled bus error paddr: %08x\n",paddr);
+        printf("unhandled bus error at pc: %08x reading paddr: %08x\n",emu->pc,paddr);
         exit(1);
     }
     
@@ -230,8 +298,10 @@ static void writeVirtWord(Mips * emu, uint32_t addr,uint32_t val) {
     }
     
     if (paddr >= emu->pmemsz) {
-        printf("unhandled bus error paddr: %08x\n",paddr);
-        exit(1);
+        printf("bus error at pc: %08x writing paddr: %08x\n",emu->pc,paddr);
+        setExceptionCode(emu,EXC_DBE);
+        emu->exceptionOccured = 1;
+        return;
     }
     
     emu->mem[paddr/4] = val;    
@@ -336,7 +406,7 @@ static void handleException(Mips * emu,int inDelaySlot) {
 }
 
 static void triggerExternalInterrupt(Mips * emu,unsigned int intNum) {
-    emu->CP0_Cause |= ((1 << intNum) & 0x3f ) << 10;     
+    emu->CP0_Cause |= ((1 << intNum) & 0x3f ) << 10;
 }
 
 static void clearExternalInterrupt(Mips * emu,unsigned int intNum) {
@@ -355,7 +425,7 @@ static int handleInterrupts(Mips * emu) {
         return 0; // no pending interrupts
     }
     
-    setExceptionCode(emu,0);
+    setExceptionCode(emu,EXC_Int);
     handleException(emu,emu->inDelaySlot);
     
     return 1;
@@ -369,14 +439,14 @@ void step_mips(Mips * emu) {
         return;
     }
     
+    emu->CP0_Count++;
     /* timer code */
-    if ( (emu->CP0_Status & 1) && (emu->CP0_Count > emu->CP0_Compare) ) {
-        // probably not really right,
+    if (emu->CP0_Count == emu->CP0_Compare){
         // but only do this if interrupts are enabled to save time.
         triggerExternalInterrupt(emu,5); // 5 is the timer int :)
     }
     
-    emu->CP0_Count++;
+    
     
     if(handleInterrupts(emu)) {
         return;
@@ -402,8 +472,6 @@ void step_mips(Mips * emu) {
     emu->regs[0] = 0;
     
 	if(emu->exceptionOccured) { //instruction failed
-	    puts("exception2!!!!!!!");
-	    exit(1);
 	    handleException(emu,startInDelaySlot);
 	    return;
 	}
@@ -894,6 +962,13 @@ static void op_mfc0(Mips * emu,uint32_t op) {
         case 3://EntryLo1
             retval = emu->CP0_EntryLo1;
             break;
+       
+        case 4: // Context
+            if(sel != 0) {
+                goto unhandled;
+            }
+            retval = emu->CP0_Context;
+            break;
             
         case 5: // Page Mask
             if(sel != 0) {
@@ -907,6 +982,14 @@ static void op_mfc0(Mips * emu,uint32_t op) {
                 goto unhandled;
             }
             retval = emu->CP0_Wired;
+            break;
+        
+        
+        case 8: // BadVAddr
+            if(sel != 0) {
+                goto unhandled;
+            }
+            retval = emu->CP0_BadVAddr;
             break;
         
         case 9: // Count
@@ -927,7 +1010,6 @@ static void op_mfc0(Mips * emu,uint32_t op) {
             if(sel != 0) {
                 goto unhandled;
             }
-            clearExternalInterrupt(emu,5);
             retval = emu->CP0_Compare;
             break;
 
@@ -943,6 +1025,14 @@ static void op_mfc0(Mips * emu,uint32_t op) {
                 goto unhandled;
             }
             retval = emu->CP0_Cause;
+            break;
+        
+        
+        case 14: // EPC
+            if (sel != 0 ) {
+                goto unhandled;
+            }
+            retval = emu->CP0_Epc;
             break;
         
         case 15:
@@ -1036,6 +1126,7 @@ static void op_mtc0(Mips * emu,uint32_t op) {
             if(sel != 0) {
                 goto unhandled;
             }
+            clearExternalInterrupt(emu,5);
             emu->CP0_Compare = rt;
             break;
        
@@ -1054,6 +1145,13 @@ static void op_mtc0(Mips * emu,uint32_t op) {
             }
             uint32_t cause_mask = ((1 << 23) | (1 << 22) | (3 << 8));
             emu->CP0_Cause = (emu->CP0_Cause & ~cause_mask ) | (rt & cause_mask);
+            break;
+
+        case 14: //epc
+            if(sel != 0) {
+                goto unhandled;
+            }
+            emu->CP0_Epc = rt;
             break;
         
         case 16:
@@ -1097,10 +1195,8 @@ static void op_eret(Mips * emu, uint32_t op) {
     emu->pc -= 4; //counteract typical pc += 4
 }
 
-static void op_tlbwi(Mips * emu, uint32_t op) {
-    
-    uint32_t idx = emu->CP0_Index;
-    
+static void helper_writeTlbEntry(Mips * emu,uint32_t idx) {
+    idx &= 0xf; //only 16 entries must mask it off
     TLB_entry * tlbent = &emu->tlb.entries[idx];
     tlbent->VPN = (emu->CP0_EntryHi & 0xfffff000) >> 12;
     tlbent->ASID = emu->CP0_EntryHi & 0xff;
@@ -1113,6 +1209,18 @@ static void op_tlbwi(Mips * emu, uint32_t op) {
     tlbent->C1 = (emu->CP0_EntryLo1  >> 3) & 7;
     tlbent->PFN[0] = ((emu->CP0_EntryLo0 >> 6) & 0xfffff) << 12;
     tlbent->PFN[1] = ((emu->CP0_EntryLo1 >> 6) & 0xfffff) << 12;
+}
+
+static void op_tlbwi(Mips * emu, uint32_t op) {
+    
+    uint32_t idx = emu->CP0_Index;
+    helper_writeTlbEntry(emu,idx);
+    
+}
+
+static void op_tlbwr(Mips * emu, uint32_t op) {
+    uint32_t idx = randomInRange(emu->CP0_Wired,15);
+    helper_writeTlbEntry(emu,idx);
     
 }
 
@@ -1296,6 +1404,16 @@ static void op_mfhi(Mips * emu,uint32_t op) {
 }
 
 
+static void op_mtlo(Mips * emu,uint32_t op) {
+    emu->lo = getRs(emu,op);
+}
+
+static void op_mthi(Mips * emu,uint32_t op) {
+    emu->hi = getRs(emu,op);
+}
+
+
+
 
 
 static void op_jalr(Mips * emu,uint32_t op) {
@@ -1312,29 +1430,17 @@ static void op_jr(Mips * emu,uint32_t op) {
 	emu->inDelaySlot = 1;
 }
 
-
-
-
 static void op_srav(Mips * emu,uint32_t op) {
     setRd(emu,op,((int32_t)getRt(emu,op) >> (getRs(emu,op)&0x1f)));
 }
-
-
-
 
 static void op_srlv(Mips * emu,uint32_t op) {
     setRd(emu,op,(getRt(emu,op) >> (getRs(emu,op)&0x1f)));
 }
 
-
-
-
 static void op_sllv(Mips * emu,uint32_t op) {
     setRd(emu,op,(getRt(emu,op) << (getRs(emu,op)&0x1f)));
 }
-
-
-
 
 static void op_sra(Mips * emu,uint32_t op) {
 	int32_t rt = getRt(emu,op);
@@ -1343,24 +1449,15 @@ static void op_sra(Mips * emu,uint32_t op) {
 	setRd(emu,op,v);
 }
 
-
-
-
 static void op_srl(Mips * emu,uint32_t op) {
 	uint32_t v = getRt(emu,op) >> getShamt(op);
 	setRd(emu,op,v);
 }
 
-
-
-
 static void op_sll(Mips * emu,uint32_t op) {
     uint32_t v = getRt(emu,op) << getShamt(op);
 	setRd(emu,op,v);
 }
-
-
-
 
 static void op_bgez(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);

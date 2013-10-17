@@ -172,6 +172,14 @@
       "000000xxxxxxxxxxxxxxxxxxxx010010"
    ],
    [
+      "mthi",
+      "000000xxxxxxxxxxxxxxxxxxxx010001"
+   ],
+   [
+      "mtlo",
+      "000000xxxxxxxxxxxxxxxxxxxx010011"
+   ],
+   [
       "mfc0",
       "01000000000xxxxxxxxxxxxxxxxxxxxx"
    ],
@@ -202,6 +210,10 @@
    [
       "tlbwi",
       "01000010000000000000000000000010"
+   ],
+   [
+      "tlbwr",
+      "01000010000000000000000000000110"
    ],
    [
       "nor",
