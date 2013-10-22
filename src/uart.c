@@ -5,6 +5,9 @@
 //XXX remove this when exit calls are removed...
 #include <stdlib.h>
 
+//XXX ThrowCTI NextInterrupt and ClearInterrupt recurse sometimes
+//seemingly pointlessly.
+
 /* some forward declarations */
 
 static void uart_NextInterrupt(Uart * serial); 
@@ -128,6 +131,7 @@ static void uart_ThrowCTI (Uart * serial){
 };
 
 
+//Internal uart interrupts not the external interrupt line
 static void uart_ClearInterrupt(Uart * serial,int line) {
     serial->ints &= ~ (1 << line);
     serial->IIR = UART_IIR_NO_INT;
