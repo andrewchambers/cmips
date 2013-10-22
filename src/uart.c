@@ -29,6 +29,7 @@ void uart_write(Mips * emu,uint32_t offset,uint32_t v){
 uint8_t uart_readb(Mips * emu,uint32_t offset){
     uint8_t ret = uart_ReadReg8(&(emu->serial),offset);
     //printf("serial readb %u %x\n",offset, ret);
+    return ret;
 }
 
 
@@ -90,9 +91,10 @@ static void uart_fifoPush(Uart * serial, uint8_t c) {
 static uint8_t uart_fifoGet(Uart * serial) {
     uint8_t c = serial->fifo[serial->fifoCur];
     serial->fifoCur = (serial->fifoCur + 1) % 32;
+    return c;
 }
 
-static uint8_t uart_fifoClear(Uart * serial) {
+static void uart_fifoClear(Uart * serial) {
     serial->fifoCur = 0;
     serial->fifoIdx = 0;
 }
