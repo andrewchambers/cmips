@@ -179,6 +179,11 @@ static uint32_t randomInRange(uint32_t a,uint32_t b) {
 }
 
 
+static void writeTlbExceptionExtraData(Mips * emu,uint32_t vaddr) {
+    emu->CP0_BadVAddr = vaddr;
+    emu->CP0_Context = (emu->CP0_Context & ~0x007fffff) |((vaddr >> 9) & 0x007ffff0);
+    emu->CP0_EntryHi = (emu->CP0_EntryHi & 0xff) | (vaddr & (~0x1fff));
+}
 
 // tlb code modified from qemu
 
@@ -189,7 +194,6 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
     for (i = 0; i < 16; i++) {
         //printf("ent %d\n",i);
         TLB_entry *tlb_e = &emu->tlb.entries[i];
-        /* 1k pages are not supported. */
         uint32_t mask = tlb_e->PageMask;
         uint32_t tag = vaddress & ~mask;
         uint32_t VPN = tlb_e->VPN & ~mask;
@@ -204,6 +208,8 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
                 //printf("invalid %d %d\n",tlb_e->V1,tlb_e->V0);
                 emu->exceptionOccured = 1;
                 setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
+                writeTlbExceptionExtraData(emu,vaddress);
+                //puts("tlb invalid");
                 return TLBRET_INVALID;
             }
             if (write == 0 || (n ? tlb_e->D1 : tlb_e->D0)) {
@@ -213,11 +219,15 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
             }
             emu->exceptionOccured = 1;
             setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
+            puts("unhandled tlb dirty exception");
+            exit(1);
+            writeTlbExceptionExtraData(emu,vaddress);
             return TLBRET_DIRTY;
         }
     }
     emu->exceptionOccured = 1;
     setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
+    writeTlbExceptionExtraData(emu,vaddress);
     return TLBRET_NOMATCH;
 }
 
@@ -446,17 +456,13 @@ void step_mips(Mips * emu) {
         triggerExternalInterrupt(emu,5); // 5 is the timer int :)
     }
     
-    
-    
     if(handleInterrupts(emu)) {
         return;
     }
     
     /* end timer code */
     
-    
 	int startInDelaySlot = emu->inDelaySlot;
-	
 	
 	uint32_t opcode = readVirtWord(emu,emu->pc);
 	
