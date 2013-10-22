@@ -65,6 +65,8 @@ Mips * new_mips(uint32_t physMemSize) {
     
     ret->CP0_Status |= (1 << CP0St_ERL); //start in kernel mode with unmapped useg
     
+    uart_Reset(&ret->serial);
+    
     return ret;
 }
 
