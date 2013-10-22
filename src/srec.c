@@ -156,7 +156,7 @@ static int srecLoadData(SrecLoader * loader,Mips * emu,uint32_t addr,uint32_t co
             return 1;
         }
         
-        writeb(emu,addr++,b); //TODO check for exception/mapped address
+        writeb(emu,addr++,b); 
     }
     return 0;
 }

@@ -27,6 +27,27 @@ typedef struct {
 
 
 typedef struct {
+    uint8_t LCR; // Line Control, reset, character has 8 bits
+    uint8_t LSR; // Line Status register, Transmitter serial register empty and Transmitter buffer register empty
+    uint8_t MSR; // modem status register
+    uint8_t IIR; // Interrupt Identification, no interrupt
+    uint8_t ints;// no interrupt pending
+    uint8_t IER; //Interrupt Enable
+    uint8_t DLL;
+    uint8_t DLH;
+    uint8_t FCR; // FIFO Control;
+    uint8_t MCR; // Modem Control
+    uint8_t input;
+    
+    uint8_t fifo[32]; //ring buffer
+    uint32_t fifoIdx;
+    uint32_t fifoCur;
+    
+} Uart;
+
+
+
+typedef struct {
     uint32_t * mem;
     uint32_t pmemsz;
     uint32_t shutdown;
@@ -55,6 +76,8 @@ typedef struct {
     
     uint32_t CP0_Count;
     uint32_t CP0_Compare;
+    
+    Uart serial;
     
     TLB tlb;
 } Mips;
@@ -86,6 +109,10 @@ typedef struct {
 EmuTrace * startTrace(char * tracefile);
 void updateTrace(EmuTrace * t,Mips * emu);
 void endTrace(EmuTrace * t);
+
+
+
+void uart_Reset(Uart * serial);
 
 uint32_t uart_read(Mips * emu,uint32_t offset);
 void uart_write(Mips * emu,uint32_t offset,uint32_t v);
