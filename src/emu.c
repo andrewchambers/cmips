@@ -138,7 +138,8 @@ static inline uint32_t isKernelMode(Mips * emu) {
 // this function is used by tlbw and the random register
 // between the inclusive range. popular misconception 
 // is that modulo min + rand % range is uniform.
-//XXX make more deterministic so emulators can go in lockstep
+// XXX make more deterministic so emulators can go in lockstep
+// XXX make faster/better?
 static uint32_t randomInRange(uint32_t a,uint32_t b) {
     
     uint32_t v;
@@ -193,6 +194,9 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
     uint8_t ASID = emu->CP0_EntryHi & 0xFF;
     int i;
     //printf("tlblookup for addr %08x\n",vaddress);
+    
+    emu->tlb.exceptionWasNoMatch = 0;
+    
     for (i = 0; i < 16; i++) {
         //printf("ent %d\n",i);
         TLB_entry *tlb_e = &emu->tlb.entries[i];
@@ -227,6 +231,7 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
             return TLBRET_DIRTY;
         }
     }
+    emu->tlb.exceptionWasNoMatch = 1;
     emu->exceptionOccured = 1;
     setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
     writeTlbExceptionExtraData(emu,vaddress);
@@ -393,7 +398,13 @@ static void handleException(Mips * emu,int inDelaySlot) {
         }
         
         if (exccode == EXC_TLBL || exccode == EXC_TLBS ) {
-            offset = 0;
+            //printf("tlb exception %x\n",emu->CP0_Epc);
+            //XXX this seems inverted? bug in also qemu? test with these cases reversed after booting.
+            if(!emu->tlb.exceptionWasNoMatch) {
+                offset = 0x180;
+            } else {
+                offset = 0;
+            }
         } else if ( (exccode == EXC_Int) && ((emu->CP0_Cause & (1 << 23)) != 0)) {
             offset = 0x200;
         } else {
@@ -412,9 +423,15 @@ static void handleException(Mips * emu,int inDelaySlot) {
     } else {
         emu->pc = 0x80000000 + offset;
     }
+
+    //if(exccode != EXC_Int) {
+    //    printf("jumping to address %x\n",emu->pc);
+    //    printf("status %08x\n",emu->CP0_Status);
+    //    printf("cause %08x\n",emu->CP0_Cause);
+    //}
     
     emu->exceptionOccured = 0;
-
+    
 }
 
 static void triggerExternalInterrupt(Mips * emu,unsigned int intNum) {

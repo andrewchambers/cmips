@@ -23,6 +23,7 @@ typedef struct  {
 
 typedef struct {
     TLB_entry entries[16];
+    int exceptionWasNoMatch;
 } TLB;
 
 
