@@ -1229,7 +1229,27 @@ static void op_tlbwi(Mips * emu, uint32_t op) {
 static void op_tlbwr(Mips * emu, uint32_t op) {
     uint32_t idx = randomInRange(emu->CP0_Wired,15);
     helper_writeTlbEntry(emu,idx);
+}
+
+static void op_tlbp(Mips * emu, uint32_t op) {
     
+    uint8_t ASID = emu->CP0_EntryHi & 0xFF;
+    int i;
+    
+    emu->CP0_Index = 0x80000000;
+    
+    for (i = 0; i < 16; i++) {
+        TLB_entry *tlb_e = &emu->tlb.entries[i];
+        uint32_t mask = tlb_e->PageMask;
+        uint32_t tag = emu->CP0_EntryHi & ~mask;
+        uint32_t VPN = tlb_e->VPN & ~mask;
+        /* Check ASID, virtual page number & size */
+        if ((tlb_e->G == 1 || tlb_e->ASID == ASID) && VPN == tag) {
+            /* TLB match */
+            emu->CP0_Index = i;
+            return;
+        }
+    }
 }
 
 
