@@ -38,11 +38,12 @@ typedef struct {
     uint8_t DLH;
     uint8_t FCR; // FIFO Control;
     uint8_t MCR; // Modem Control
-    uint8_t input;
     
+    //NOTE dont change this size without changing the corresponding fifo function
     uint8_t fifo[32]; //ring buffer
-    uint32_t fifoIdx;
-    uint32_t fifoCur;
+    uint32_t fifoFirst;
+    uint32_t fifoLast;
+    uint32_t fifoCount;
     
 } Uart;
 
@@ -111,9 +112,16 @@ EmuTrace * startTrace(char * tracefile);
 void updateTrace(EmuTrace * t,Mips * emu);
 void endTrace(EmuTrace * t);
 
+static void triggerExternalInterrupt(Mips * emu,unsigned int intNum) {
+    emu->CP0_Cause |= ((1 << intNum) & 0x3f ) << 10;
+}
+
+static void clearExternalInterrupt(Mips * emu,unsigned int intNum) {
+    emu->CP0_Cause &= ~(((1 << intNum) & 0x3f ) << 10);  
+}
 
 
-void uart_Reset(Uart * serial);
+void uart_Reset(Mips * emu);
 
 uint32_t uart_read(Mips * emu,uint32_t offset);
 void uart_write(Mips * emu,uint32_t offset,uint32_t v);

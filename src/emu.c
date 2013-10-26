@@ -65,7 +65,7 @@ Mips * new_mips(uint32_t physMemSize) {
     
     ret->CP0_Status |= (1 << CP0St_ERL); //start in kernel mode with unmapped useg
     
-    uart_Reset(&ret->serial);
+    uart_Reset(ret);
     
     return ret;
 }
@@ -434,13 +434,6 @@ static void handleException(Mips * emu,int inDelaySlot) {
     
 }
 
-static void triggerExternalInterrupt(Mips * emu,unsigned int intNum) {
-    emu->CP0_Cause |= ((1 << intNum) & 0x3f ) << 10;
-}
-
-static void clearExternalInterrupt(Mips * emu,unsigned int intNum) {
-    emu->CP0_Cause &= ~(((1 << intNum) & 0x3f ) << 10);     
-}
 
 /* return 1 if interrupt occured else 0*/
 static int handleInterrupts(Mips * emu) {
