@@ -64,12 +64,20 @@
       "000001xxxxx00001xxxxxxxxxxxxxxxx"
    ],
    [
+      "bgezal",
+      "000001xxxxx10001xxxxxxxxxxxxxxxx"
+   ],
+   [
       "bgezl",
       "000001xxxxx00011xxxxxxxxxxxxxxxx"
    ],
    [
       "bltz",
       "000001xxxxx00000xxxxxxxxxxxxxxxx"
+   ],
+   [
+      "bltzal",
+      "000001xxxxx10000xxxxxxxxxxxxxxxx"
    ],
    [
       "bltzl",

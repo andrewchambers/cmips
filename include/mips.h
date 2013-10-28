@@ -8,8 +8,7 @@
 
 
 typedef struct  {
-    uint32_t VPN;
-    uint32_t PageMask;
+    uint32_t VPN2;
     uint8_t ASID;
     uint16_t G:1;
     uint32_t C0:3;

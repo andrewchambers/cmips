@@ -190,43 +190,33 @@ static void writeTlbExceptionExtraData(Mips * emu,uint32_t vaddr) {
 
 // tlb code modified from qemu
 
+//XXX currently hardcoded for 4k pages
 static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int write) {
     uint8_t ASID = emu->CP0_EntryHi & 0xFF;
     int i;
-    //printf("tlblookup for addr %08x\n",vaddress);
-    
     emu->tlb.exceptionWasNoMatch = 0;
     
     for (i = 0; i < 16; i++) {
-        //printf("ent %d\n",i);
         TLB_entry *tlb_e = &emu->tlb.entries[i];
-        uint32_t mask = tlb_e->PageMask;
-        uint32_t tag = vaddress & ~mask;
-        uint32_t VPN = tlb_e->VPN & ~mask;
-        //printf("mask: %08x tag: %08x vpn %08x\n",mask,tag,VPN);
+        uint32_t tag = (vaddress & 0xfffff000) >> 13;
+        uint32_t VPN2 = tlb_e->VPN2;
         /* Check ASID, virtual page number & size */
-        if ((tlb_e->G == 1 || tlb_e->ASID == ASID) && VPN == tag) {
+        if ((tlb_e->G == 1 || tlb_e->ASID == ASID) && VPN2 == tag) {
             /* TLB match */
-            int n = !!(vaddress & mask & ~(mask >> 1));
-            //printf("match! %d \n",n);
+            int n = (vaddress >> 12) & 1;
             /* Check access rights */
             if (!(n ? tlb_e->V1 : tlb_e->V0)) {
-                //printf("invalid %d %d\n",tlb_e->V1,tlb_e->V0);
                 emu->exceptionOccured = 1;
                 setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
                 writeTlbExceptionExtraData(emu,vaddress);
-                //puts("tlb invalid");
                 return TLBRET_INVALID;
             }
             if (write == 0 || (n ? tlb_e->D1 : tlb_e->D0)) {
-                //printf("\n returning %08x\n",tlb_e->PFN[n] | (vaddress & (mask >> 1)));
-                *physical = tlb_e->PFN[n] | (vaddress & (mask >> 1));
+                *physical = tlb_e->PFN[n] | (vaddress & 0xfff);
                 return TLBRET_MATCH;
             }
             emu->exceptionOccured = 1;
             setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
-            puts("unhandled tlb dirty exception");
-            exit(1);
             writeTlbExceptionExtraData(emu,vaddress);
             return TLBRET_DIRTY;
         }
@@ -479,8 +469,6 @@ void step_mips(Mips * emu) {
 	uint32_t opcode = readVirtWord(emu,emu->pc);
 	
 	if(emu->exceptionOccured) { //instruction fetch failed
-	    printf("exception!!!!!!! pc: %08x\n",emu->pc);
-	    exit(1);
 	    handleException(emu,startInDelaySlot);
 	    return;
 	}
@@ -667,9 +655,6 @@ static void op_lb(Mips * emu,uint32_t op) {
     }
 	setRt(emu,op,(int32_t)v);
 }
-
-
-
 
 static void op_beq(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
@@ -1115,7 +1100,10 @@ static void op_mtc0(Mips * emu,uint32_t op) {
                 puts("untested page mask!");
                 exit(1);
             }
-            
+            if (rt != 0) {
+                puts("XXX unhandled page mask");
+                exit(1);
+            }
             emu->CP0_PageMask = rt & 0x1ffe000;
             break;
 
@@ -1216,7 +1204,7 @@ static void op_eret(Mips * emu, uint32_t op) {
 static void helper_writeTlbEntry(Mips * emu,uint32_t idx) {
     idx &= 0xf; //only 16 entries must mask it off
     TLB_entry * tlbent = &emu->tlb.entries[idx];
-    tlbent->VPN = (emu->CP0_EntryHi & 0xfffff000) >> 12;
+    tlbent->VPN2 = emu->CP0_EntryHi >> 13;
     tlbent->ASID = emu->CP0_EntryHi & 0xff;
     tlbent->G = (emu->CP0_EntryLo0 | emu->CP0_EntryLo1) & 1;
     tlbent->V0 = (emu->CP0_EntryLo0 & 2) > 0;
@@ -1241,6 +1229,7 @@ static void op_tlbwr(Mips * emu, uint32_t op) {
     helper_writeTlbEntry(emu,idx);
 }
 
+//XXX hardcoded for 4k pages
 static void op_tlbp(Mips * emu, uint32_t op) {
     
     uint8_t ASID = emu->CP0_EntryHi & 0xFF;
@@ -1250,11 +1239,10 @@ static void op_tlbp(Mips * emu, uint32_t op) {
     
     for (i = 0; i < 16; i++) {
         TLB_entry *tlb_e = &emu->tlb.entries[i];
-        uint32_t mask = tlb_e->PageMask;
-        uint32_t tag = emu->CP0_EntryHi & ~mask;
-        uint32_t VPN = tlb_e->VPN & ~mask;
+        uint32_t tag = (emu->CP0_EntryHi & 0xfffff000) >> 13;
+        uint32_t VPN2 = tlb_e->VPN2;
         /* Check ASID, virtual page number & size */
-        if ((tlb_e->G == 1 || tlb_e->ASID == ASID) && VPN == tag) {
+        if ((tlb_e->G == 1 || tlb_e->ASID == ASID) && VPN2 == tag) {
             /* TLB match */
             emu->CP0_Index = i;
             return;
@@ -1497,6 +1485,17 @@ static void op_sll(Mips * emu,uint32_t op) {
 	setRd(emu,op,v);
 }
 
+static void op_bgezal(Mips * emu,uint32_t op) {
+	int32_t offset = sext18(getImm(op) * 4);
+	if (((int32_t)getRs(emu,op)) >= 0) {
+		emu->delaypc = (int32_t)(emu->pc + 4) + offset;
+	} else {
+		emu->delaypc = emu->pc + 8;
+	}
+	emu->regs[31] = emu->pc + 8;
+	emu->inDelaySlot = 1;
+}
+
 static void op_bgez(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
 	if (((int32_t)getRs(emu,op)) >= 0) {
@@ -1517,6 +1516,16 @@ static void op_bgezl(Mips * emu,uint32_t op) {
 	}
 }
 
+static void op_bltzal(Mips * emu,uint32_t op) {
+	int32_t offset = sext18(getImm(op) * 4);
+	if (((int32_t)getRs(emu,op)) < 0) {
+		emu->delaypc = (int32_t)(emu->pc + 4) + offset;
+	} else {
+		emu->delaypc = emu->pc + 8;
+	}
+	emu->regs[31] = emu->pc + 8;
+	emu->inDelaySlot = 1;
+}
 
 static void op_bltz(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
