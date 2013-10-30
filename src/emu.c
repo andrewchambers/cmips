@@ -116,10 +116,9 @@ static inline void setExceptionCode(Mips * emu,int code) {
 
 static inline uint32_t isKernelMode(Mips * emu) {
     
-    if (emu->CP0_Status & (1 << CP0St_UM)) {
-        return 0;
-    }    
-    
+    if (! (emu->CP0_Status & (1 << CP0St_UM))) {
+        return 1;
+    }
     return emu->CP0_Status & ((1 << CP0St_EXL) | (1 << CP0St_ERL));
 }
 
@@ -185,10 +184,27 @@ static uint32_t randomInRange(uint32_t a,uint32_t b) {
 static void writeTlbExceptionExtraData(Mips * emu,uint32_t vaddr) {
     emu->CP0_BadVAddr = vaddr;
     emu->CP0_Context = (emu->CP0_Context & ~0x007fffff) |((vaddr >> 9) & 0x007ffff0);
-    emu->CP0_EntryHi = (emu->CP0_EntryHi & 0xff) | (vaddr & (~0x1fff));
+    emu->CP0_EntryHi = (emu->CP0_EntryHi & 0xff) | (vaddr & (0xffffe000));
 }
 
-// tlb code modified from qemu
+
+static void debug_dumpTlb(Mips * emu) {
+    int i;
+    for (i = 0; i < 16; i++) {
+        TLB_entry *tlb_e = &emu->tlb.entries[i];
+        printf("TLBENT %d:\n"
+               "   VPN2: %08x\n"
+               "   ASID: %02x\n"
+               "   G: %d\n"
+               "   V0: %d\n"
+               "   V1: %d\n"
+               //XXX more fields
+            ,i,tlb_e->VPN2,tlb_e->ASID,tlb_e->G,tlb_e->V0,tlb_e->V1);
+    }
+
+} 
+
+
 
 //XXX currently hardcoded for 4k pages
 static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int write) {
@@ -216,7 +232,7 @@ static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int writ
                 return TLBRET_MATCH;
             }
             emu->exceptionOccured = 1;
-            setExceptionCode(emu,write ? EXC_TLBS : EXC_TLBL);
+            setExceptionCode(emu,EXC_Mod);
             writeTlbExceptionExtraData(emu,vaddress);
             return TLBRET_DIRTY;
         }
@@ -251,6 +267,8 @@ static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_ou
             return tlb_lookup(emu,vaddr,paddr_out, write);
         } else {
             *paddr_out = vaddr;
+            puts("translateAddress: unhandled exception");
+            exit(1);
             return 1;
         }
         
@@ -377,6 +395,8 @@ static void handleException(Mips * emu,int inDelaySlot) {
 
     uint32_t offset;
     int exccode = getExceptionCode(emu);
+        
+    emu->inDelaySlot = 0;
     
     if ( (emu->CP0_Status & (1 << CP0St_EXL))  == 0) {
         if (inDelaySlot) {
@@ -415,9 +435,11 @@ static void handleException(Mips * emu,int inDelaySlot) {
     }
 
     //if(exccode != EXC_Int) {
-    //    printf("jumping to address %x\n",emu->pc);
-    //    printf("status %08x\n",emu->CP0_Status);
-    //    printf("cause %08x\n",emu->CP0_Cause);
+    //    #define TARGET_FMT_lx "%08x"
+    //    printf("\nException: PC " TARGET_FMT_lx " EPC " TARGET_FMT_lx " cause %d\n"
+    //            "    S %08x C %08x A " TARGET_FMT_lx "\n",
+    //            emu->pc, emu->CP0_Epc, exccode,
+    //            emu->CP0_Status, emu->CP0_Cause, emu->CP0_BadVAddr);
     //}
     
     emu->exceptionOccured = 0;
@@ -467,6 +489,7 @@ void step_mips(Mips * emu) {
 	int startInDelaySlot = emu->inDelaySlot;
 	
 	uint32_t opcode = readVirtWord(emu,emu->pc);
+	
 	
 	if(emu->exceptionOccured) { //instruction fetch failed
 	    handleException(emu,startInDelaySlot);
@@ -1185,6 +1208,7 @@ static void op_pref(Mips * emu, uint32_t op) {
 
 static void op_eret(Mips * emu, uint32_t op) {
     
+    
     if(emu->inDelaySlot){
         return;
     }
@@ -1202,11 +1226,12 @@ static void op_eret(Mips * emu, uint32_t op) {
 }
 
 static void helper_writeTlbEntry(Mips * emu,uint32_t idx) {
+    //printf("tlb write idx %d\n",idx);
     idx &= 0xf; //only 16 entries must mask it off
     TLB_entry * tlbent = &emu->tlb.entries[idx];
     tlbent->VPN2 = emu->CP0_EntryHi >> 13;
     tlbent->ASID = emu->CP0_EntryHi & 0xff;
-    tlbent->G = (emu->CP0_EntryLo0 | emu->CP0_EntryLo1) & 1;
+    tlbent->G = (emu->CP0_EntryLo0 & emu->CP0_EntryLo1) & 1;
     tlbent->V0 = (emu->CP0_EntryLo0 & 2) > 0;
     tlbent->V1 = (emu->CP0_EntryLo1 & 2) > 0;
     tlbent->D0 = (emu->CP0_EntryLo0 & 4) > 0;
