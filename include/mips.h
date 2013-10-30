@@ -77,7 +77,8 @@ typedef struct {
     
     uint32_t CP0_Count;
     uint32_t CP0_Compare;
-    
+
+    int waiting;    
     
     Uart serial;
     

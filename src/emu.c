@@ -459,6 +459,7 @@ static int handleInterrupts(Mips * emu) {
         return 0; // no pending interrupts
     }
     
+    emu->waiting = 0;
     setExceptionCode(emu,EXC_Int);
     handleException(emu,emu->inDelaySlot);
     
@@ -481,6 +482,10 @@ void step_mips(Mips * emu) {
     }
     
     if(handleInterrupts(emu)) {
+        return;
+    }
+    
+    if(emu->waiting) {
         return;
     }
     
@@ -546,6 +551,18 @@ static inline uint32_t getShamt(uint32_t op) {
 
 /* start opcode implementations */ 
 
+static void op_wait(Mips * emu,uint32_t op) {
+    emu->waiting = 1;
+}
+
+static void op_syscall(Mips * emu,uint32_t op) {
+    emu->exceptionOccured = 1;
+    setExceptionCode(emu,EXC_SYS);
+}
+
+static void op_sync(Mips * emu,uint32_t op) {
+    /* hopefully nothing needed */
+}
 
 static void op_swl(Mips * emu,uint32_t op) {
     int32_t c = (int16_t)(op&0x0000ffff);

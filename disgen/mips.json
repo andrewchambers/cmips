@@ -302,5 +302,17 @@
    [
       "sw",
       "101011xxxxxxxxxxxxxxxxxxxxxxxxxx"
+   ],
+   [
+      "syscall",
+      "000000xxxxxxxxxxxxxxxxxxxx001100"
+   ],
+   [
+      "sync",
+      "000000xxxxxxxxxxxxxxxxxxxx001111"
+   ],
+   [
+      "wait",
+      "0100001xxxxxxxxxxxxxxxxxxx100000"
    ]
 ]

@@ -6,8 +6,10 @@ class CGen(CodeGenerator):
         print self.ws + "void doop(Mips * emu, uint32_t op) {"
     
     def endFunc(self):
-        print self.ws + "    printf(\"unhandled opcode at %x -> %x\\n\",emu->pc,op);"
-        print self.ws + "    exit(1);"
+        print self.ws + "    //printf(\"unhandled opcode at %x -> %x\\n\",emu->pc,op);"
+        print self.ws + "    setExceptionCode(emu,EXC_RI);"
+        print self.ws + "    emu->exceptionOccured = 1;"
+        print self.ws + "    return;"
         print self.ws + "}"
     
     def startSwitch(self,switch):
