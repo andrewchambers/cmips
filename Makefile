@@ -3,7 +3,7 @@
 all: emu
 
 emu: ./src/*.c ./src/gen/doop.gen.c ./include/*.h 
-	gcc -O2 -I./include/ ./src/*.c  -o emu
+	gcc -O2 -I./include/ ./src/*.c -lpthread  -o emu
 
 
 ./src/gen/doop.gen.c: ./disgen/*.py ./disgen/mips.json

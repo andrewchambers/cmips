@@ -31,12 +31,12 @@ typedef struct {
     uint8_t LSR; // Line Status register, Transmitter serial register empty and Transmitter buffer register empty
     uint8_t MSR; // modem status register
     uint8_t IIR; // Interrupt Identification, no interrupt
-    uint8_t ints;// no interrupt pending
-    uint8_t IER; //Interrupt Enable
+    uint8_t IER; // Interrupt Enable
     uint8_t DLL;
     uint8_t DLH;
     uint8_t FCR; // FIFO Control;
     uint8_t MCR; // Modem Control
+    uint8_t SCR; // Modem Control
     
     //NOTE dont change this size without changing the corresponding fifo function
     uint8_t fifo[32]; //ring buffer

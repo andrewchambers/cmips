@@ -71,6 +71,7 @@ void uart_writeb(Mips * emu,uint32_t offset,uint8_t v){
 #define UART_MCR 4 /* W: Modem Control Register */
 #define UART_LSR 5 /* R: Line Status Register */
 #define UART_MSR 6 /* R: Modem Status Register */
+#define UART_SCR 7 /* R/W:  */
 
 /* FIFO code - used so we dont drop characters of input */
 // dont call these directly, 
@@ -121,64 +122,38 @@ void uart_Reset(Mips * emu) {
     emu->serial.LSR = UART_LSR_TRANSMITTER_EMPTY | UART_LSR_FIFO_EMPTY;
     emu->serial.MSR = 0;
     emu->serial.IIR = UART_IIR_NO_INT;
-    emu->serial.ints = 0;
     emu->serial.IER = 0;
     emu->serial.DLL = 0;
     emu->serial.DLH = 0;
     emu->serial.FCR = 0;
     emu->serial.MCR = 0;
-    
+    emu->serial.SCR = 0;
     uart_fifoClear(emu);
 }
 
-static void uart_ThrowCTI (Mips * emu){
-    emu->serial.ints |= 1 << UART_IIR_CTI;
-    if (!(emu->serial.IER & UART_IER_RDI)) {
-        return;
-    }
-    if ((emu->serial.IIR != UART_IIR_RLSI) && (emu->serial.IIR != UART_IIR_RDI)) {
-        emu->serial.IIR = UART_IIR_CTI;
-        triggerExternalInterrupt(emu,0);
-    }
-};
-
-
-//Internal uart interrupts not the external interrupt line
-static void uart_ClearInterrupt(Mips * emu,int line) {
-    emu->serial.ints &= ~ (1 << line);
-    emu->serial.IIR = UART_IIR_NO_INT;
-    if (line != emu->serial.IIR) {
-        return;
-    }
-    uart_NextInterrupt(emu);
-};
-
-static void uart_ThrowTHRI (Mips * emu){
-    emu->serial.ints |= 1 << UART_IIR_THRI;
-    if (!(emu->serial.IER & UART_IER_THRI)) {
-        return;
-    }
-    if ((emu->serial.IIR & UART_IIR_NO_INT) || (emu->serial.IIR == UART_IIR_MSI) || (emu->serial.IIR == UART_IIR_THRI)) {
+static void uart_UpdateIrq (Mips * emu){
+    if ((emu->serial.LSR & UART_LSR_DATA_READY) && (emu->serial.IER & UART_IER_RDI)) {
+        emu->serial.IIR = UART_IIR_RDI;
+    } else if ((emu->serial.LSR & UART_LSR_FIFO_EMPTY) && (emu->serial.IER & UART_IER_THRI)) {
         emu->serial.IIR = UART_IIR_THRI;
+    } else {
+        emu->serial.IIR = UART_IIR_NO_INT;
+    }
+    
+    //if there is an interrupt pending
+    if (emu->serial.IIR != UART_IIR_NO_INT) {
         triggerExternalInterrupt(emu,0);
+    } else {
+        clearExternalInterrupt(emu,0);
     }
 };
+
+
 
 void uart_RecieveChar(Mips * emu, uint8_t c) {
     uart_fifoPush(emu,c);
-    uart_ClearInterrupt(emu,UART_IIR_CTI);
-    uart_ThrowCTI(emu);
-};
-
-static void uart_NextInterrupt(Mips * emu) {
-    if ((emu->serial.ints & (1 << UART_IIR_CTI)) && (emu->serial.IER & UART_IER_RDI)) {
-        uart_ThrowCTI(emu);
-    } else if ((emu->serial.ints & (1 << UART_IIR_THRI)) && (emu->serial.IER & UART_IER_THRI)) {
-        uart_ThrowTHRI(emu);
-    } else {
-        emu->serial.IIR = UART_IIR_NO_INT;
-        clearExternalInterrupt(emu,0);
-    }
+    emu->serial.LSR |= UART_LSR_DATA_READY;
+    uart_UpdateIrq(emu);
 };
 
 
@@ -199,14 +174,14 @@ static uint8_t uart_ReadReg8(Mips * emu ,uint32_t offset) {
     switch (offset) {
     case 0:
         ret = 0;
-        uart_ClearInterrupt(emu,UART_IIR_RDI);
-        uart_ClearInterrupt(emu,UART_IIR_CTI);
         if (uart_fifoHasData(emu)) {
-            emu->serial.LSR |= UART_LSR_DATA_READY;
-            //uart_ThrowCTI(uart);
             ret = uart_fifoGet(emu);
+            emu->serial.LSR &= ~UART_LSR_DATA_READY;
+            if (uart_fifoHasData(emu)) {
+                emu->serial.LSR |= UART_LSR_DATA_READY;
+            }
         }
-
+        uart_UpdateIrq(emu);
         return ret;
     case UART_IER:
         return emu->serial.IER & 0x0F;
@@ -215,21 +190,19 @@ static uint8_t uart_ReadReg8(Mips * emu ,uint32_t offset) {
     case UART_MCR:
         return emu->serial.MCR;
     case UART_IIR:
-        ret = (emu->serial.IIR & 0x0f) | 0xC0; // the two top bits are always set
-        if (emu->serial.IIR == UART_IIR_THRI) {
-            uart_ClearInterrupt(emu,UART_IIR_THRI);
-        }
+        ret = emu->serial.IIR; // the two top bits are always set
         return ret;
     case UART_LCR:
         return emu->serial.LCR;
     case UART_LSR:
         if (uart_fifoHasData(emu)) {
             emu->serial.LSR |= UART_LSR_DATA_READY;
-        }
-        else {
+        } else {
             emu->serial.LSR &= ~UART_LSR_DATA_READY;
         }
         return emu->serial.LSR;
+    case UART_SCR:
+        return emu->serial.SCR;
     default:
         printf("Error in uart ReadRegister: not supported %u\n",offset);
         exit(1);
@@ -254,24 +227,21 @@ static void uart_WriteReg8(Mips * emu,uint32_t offset, uint8_t x) {
     switch (offset) {
     case 0:
         emu->serial.LSR &= ~UART_LSR_FIFO_EMPTY;
-        
         if (emu->serial.MCR & (1 << 4)) { //LOOPBACK 
             uart_RecieveChar(emu,x);
         } else {
             putchar(x);
             fflush(stdout);
         }
-        
-        
-        // Data is send with a latency of zero!
+        // Data is sent with a latency of zero!
         emu->serial.LSR |= UART_LSR_FIFO_EMPTY; // send buffer is empty					
-        uart_ThrowTHRI(emu);
+        uart_UpdateIrq(emu);
         return;
     case UART_IER:
         // 2 = 10b ,5=101b, 7=111b
         emu->serial.IER = x & 0x0F; // only the first four bits are valid
         // Ok, check immediately if there is a interrupt pending
-        uart_NextInterrupt(emu);
+        uart_UpdateIrq(emu);
         break;
     case UART_FCR:
         emu->serial.FCR = x;
@@ -285,9 +255,11 @@ static void uart_WriteReg8(Mips * emu,uint32_t offset, uint8_t x) {
     case UART_MCR:
         emu->serial.MCR = x;
         break;
+    case UART_SCR:
+        emu->serial.SCR = x;
+        break;
     default:
         printf("Error in uart WriteRegister: not supported %u\n",offset);
-        exit(1);
     }
 };
 
