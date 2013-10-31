@@ -128,6 +128,7 @@ uint32_t uart_read(Mips * emu,uint32_t offset);
 void uart_write(Mips * emu,uint32_t offset,uint32_t v);
 uint8_t uart_readb(Mips * emu,uint32_t offset);
 void uart_writeb(Mips * emu,uint32_t offset,uint8_t v);
+void uart_RecieveChar(Mips * emu, uint8_t c);
 
 extern char * regn2o32[];
 

@@ -138,9 +138,7 @@ static void uart_ThrowCTI (Mips * emu){
     }
     if ((emu->serial.IIR != UART_IIR_RLSI) && (emu->serial.IIR != UART_IIR_RDI)) {
         emu->serial.IIR = UART_IIR_CTI;
-        puts("unimplemented raise interrupt");
-        exit(1);
-        //RaiseInterrupt(0x2);
+        triggerExternalInterrupt(emu,0);
     }
 };
 
@@ -166,7 +164,7 @@ static void uart_ThrowTHRI (Mips * emu){
     }
 };
 
-static void uart_RecieveChar(Mips * emu, uint8_t c) {
+void uart_RecieveChar(Mips * emu, uint8_t c) {
     uart_fifoPush(emu,c);
     uart_ClearInterrupt(emu,UART_IIR_CTI);
     uart_ThrowCTI(emu);
