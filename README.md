@@ -7,8 +7,7 @@ Currently supports a uart chip, and uses the cpu timer.
 
 will eventually support pluggable framebuffer, mtd flash, 8250 uart, real time clock.
 
-Status Currently partially boots a custom built linux kernel. Booting fails after reaching 
-/sbin/init userspace.
+Status Currently boots a custom built linux kernel. timers are broken
 
 test suite located at https://github.com/andrewchambers/met.
 
