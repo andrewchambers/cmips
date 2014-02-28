@@ -77,6 +77,35 @@ int ttyraw()
 	return 0;
 }
 
+static void printstate(Mips * emu) {
+    int i;
+    fprintf(stderr,"State:\n");
+    for(i = 0; i < 32; i++){
+        fprintf(stderr,"%s%d: %08x\n","gr",i,emu->regs[i]);
+    }
+    
+    #define PRFIELD(X) fprintf(stderr, #X ": %08x\n",emu->X); 
+    PRFIELD(hi);
+    PRFIELD(lo);
+    PRFIELD(pc);
+    PRFIELD(delaypc);
+    PRFIELD(CP0_Index);
+    PRFIELD(CP0_EntryHi);
+    PRFIELD(CP0_EntryLo0);
+    PRFIELD(CP0_EntryLo1);
+    PRFIELD(CP0_Context);
+    PRFIELD(CP0_Wired);
+    PRFIELD(CP0_Status);
+    PRFIELD(CP0_Epc);
+    PRFIELD(CP0_BadVAddr);
+    PRFIELD(CP0_ErrorEpc);
+    PRFIELD(CP0_Cause);
+    PRFIELD(CP0_PageMask);
+    PRFIELD(CP0_Count);
+    PRFIELD(CP0_Compare);
+    #undef PRFIELD
+    
+}
 
 void * runEmulator(void * p) {
     Mips * emu = (Mips *)p;
