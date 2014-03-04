@@ -77,9 +77,9 @@ int ttyraw()
 	return 0;
 }
 
-static void printstate(Mips * emu) {
+static void printstate(Mips * emu,uint64_t n) {
     int i;
-    fprintf(stderr,"State:\n");
+    fprintf(stderr,"State: %d\n",n);
     for(i = 0; i < 32; i++){
         fprintf(stderr,"%s%d: %08x\n","gr",i,emu->regs[i]);
     }
@@ -110,6 +110,8 @@ static void printstate(Mips * emu) {
 void * runEmulator(void * p) {
     Mips * emu = (Mips *)p;
     
+    uint64_t n = 0;
+
     while(emu->shutdown != 1) {
         int i;
         
@@ -119,7 +121,14 @@ void * runEmulator(void * p) {
         }
 
         for(i = 0; i < 1000 ; i++) {
+            if(n > 441320000) {
+                printstate(emu,n);
+            }
             step_mips(emu);
+            n++;
+            if(n >= 450000000) {
+                exit(0);
+            }
         }
         
         if(pthread_mutex_unlock(&emu_mutex)) {
@@ -140,10 +149,6 @@ int main(int argc,char * argv[]) {
         
     pthread_t emu_thread;
     
-	
-	
-	
-	
     if(pthread_mutex_init(&emu_mutex,NULL)) {
         puts("failed to create mutex");
         return 1;
@@ -166,10 +171,10 @@ int main(int argc,char * argv[]) {
         return 1;
     }
     
-	if(ttyraw()) {
-		puts("failed to configure raw mode");
-		return 1;
-	}
+	//if(ttyraw()) {
+	//	puts("failed to configure raw mode");
+	//	return 1;
+	//}
     
     if(pthread_create(&emu_thread,NULL,runEmulator,emu)) {
         puts("creating emulator thread failed!");

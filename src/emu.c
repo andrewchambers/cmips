@@ -130,54 +130,12 @@ static inline uint32_t isKernelMode(Mips * emu) {
 #define TLBRET_INVALID 3
 
 
+//horrible but deterministic fake rand for testing
+uint32_t counter = 0;
 
-
-
-// return a random uniformly distributed number
-// this function is used by tlbw and the random register
-// between the inclusive range. popular misconception 
-// is that modulo min + rand % range is uniform.
-// XXX make more deterministic so emulators can go in lockstep
-// XXX make faster/better?
 static uint32_t randomInRange(uint32_t a,uint32_t b) {
-    
-    uint32_t v;
-    uint32_t range;
-    uint32_t upper;
-    uint32_t lower;
-    uint32_t mask;
-    
-    if(a == b) {
-        return a;
-    }
-    
-    if(a > b) {
-        upper = a;
-        lower = b;
-    } else {
-        upper = b;
-        lower = a; 
-    }
-    
-    range = upper - lower;
-    
-    mask = 0;
-    //XXX calculate range with log and mask? nah, too lazy :).
-    while(1) {
-        if(mask >= range) {
-            break;
-        }
-        mask = (mask << 1) | 1;
-    }
-    
-    
-    while(1) {
-        v = rand() & mask;
-        if(v <= range) {
-            return lower + v;
-        }
-    }
-    
+   counter++;
+   return a + (counter % (1 + b - a));
 }
 
 
