@@ -74,7 +74,7 @@ int ttyraw()
 
 static void printstate(Mips * emu,uint64_t n) {
     int i;
-    fprintf(stderr,"State: %d\n",n);
+    fprintf(stderr,"State: %lu\n",n);
     for(i = 0; i < 32; i++){
         fprintf(stderr,"%s%d: %08x\n","gr",i,emu->regs[i]);
     }

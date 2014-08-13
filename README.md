@@ -4,6 +4,18 @@ cmips
 Tiny mips 4kc emulator (smallest and easiest emulator to hack on that I know of - It boots linux in a few thousands lines of C code.)
 I wrote this emulator in the month or so after I graduated university and before I started work.
 
+If this is useful to you I'd appreciate a star or credit in your project :). Let me know if it has helped you in any way, I appreciate feedback both good and bad.
+
+Building and Running
+====================
+I have not put my custom linux kernel board support code online yet, so I included a precompiled kernel in the images folder.
+I have tested on linux (main platform) and cygwin in windows.
+
+Here is a gif
+
+
+showing how to compile and run the emulator.
+
 
 Motivations
 ===========
@@ -22,11 +34,9 @@ It currently supports a uart chip, and uses the cpu timer.
 It may eventually support pluggable framebuffer, mtd flash, 8250 uart, real time clock if there are reasons to extend it.
 It uses the linux emulation of floating point instructions.
 
-(Pull requests welcome.)
+There is no way to quit the emulator currently with the keyboard because I set the terminal to raw mode and was lazy.
 
-Usage
-=====
-I have not put my custom linux kernel board support code online yet, so I included a precompiled kernel in the images folder.
+(Pull requests and issues welcome.)
 
 Tests
 =====
@@ -44,7 +54,11 @@ into a giant switch case for disassembling and executing.
 Info
 ====
 
-Those who wish to try similar projects, I learnt most of this by working with my friend on a predecessor javascript emulator.
+I used buildroot to build the image, and wrote a custom linux kernel board support package for the mips kernel following:
+http://linux.junsun.net/porting-howto/
+Unfortunately it was a bit out of date, so I had to improvise.
+
+Those who wish to try similar projects, I learnt alot by working with my friend on a predecessor javascript emulator and a gameboy emulator.
 I mainly used the mips 4kc manual I got from wikipedia, and I read parts of the qemu code if things were not totally clear.
 
 The uart code is inspired from http://s-macke.github.io/jor1k/. 
