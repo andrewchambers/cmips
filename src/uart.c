@@ -14,9 +14,6 @@ static void uart_NextInterrupt(Mips * emu);
 static uint8_t uart_ReadReg8(Mips * emu ,uint32_t offset);
 static void uart_WriteReg8(Mips * emu,uint32_t offset, uint8_t x);
 
-
-
-
 uint32_t uart_read(Mips * emu,uint32_t offset){
     return 0;
 }
@@ -148,14 +145,11 @@ static void uart_UpdateIrq (Mips * emu){
     }
 };
 
-
-
 void uart_RecieveChar(Mips * emu, uint8_t c) {
     uart_fifoPush(emu,c);
     emu->serial.LSR |= UART_LSR_DATA_READY;
     uart_UpdateIrq(emu);
 };
-
 
 static uint8_t uart_ReadReg8(Mips * emu ,uint32_t offset) {
     

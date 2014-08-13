@@ -1,3 +1,7 @@
+#Script to convert the json instruction description into a switch case.
+#Uses a simple plugin system (exec based) because I reused this across a few projects.
+
+
 import sys
 import json
 import itertools
@@ -61,11 +65,23 @@ def opstringToMask(opstring):
             andMask += "0"
     return andMask
 
+class Counter(object):
+    def __init__(self,col):
+        self.counts = {}
+        for x in col:
+            if x in self.counts:
+                self.counts[x] += 1
+            else:
+                self.counts[x] = 0
+    def __iter__(self):
+        return iter(self.counts)
+    def __getitem__(self,idx):
+        return self.counts[idx]
+
 def findBestAndMask(input):
     opstrings = map(lambda x : x[1],input)
     andMasks = map(opstringToMask,opstrings)
-    import collections
-    counts = collections.Counter(andMasks)
+    counts = Counter(andMasks)
     andMask = max(counts,key=lambda x : counts[x])
     return andMask
     

@@ -5,12 +5,7 @@
 #include <termios.h>
 #include <unistd.h>
 
-
-
 pthread_mutex_t emu_mutex;
-
-
-
 
 int ttyraw()
 {
@@ -171,8 +166,6 @@ int main(int argc,char * argv[]) {
         puts("creating emulator thread failed!");
         return 1;
     }
-    
-
 	
     while(1) {
         int c = getchar();

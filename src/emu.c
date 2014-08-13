@@ -84,8 +84,6 @@ int32_t sext18(uint32_t val) {
 	return 0x0003ffff&val;
 }
 
-
-
 //Possible Values for the EXC field in the status reg
 #define EXC_Int 0
 #define EXC_Mod 1
@@ -113,7 +111,6 @@ static inline void setExceptionCode(Mips * emu,int code) {
     emu->CP0_Cause |= (code & 0x1f) << 2; //set with new code
 }
 
-
 static inline uint32_t isKernelMode(Mips * emu) {
     
     if (! (emu->CP0_Status & (1 << CP0St_UM))) {
@@ -129,7 +126,6 @@ static inline uint32_t isKernelMode(Mips * emu) {
 #define TLBRET_DIRTY 2
 #define TLBRET_INVALID 3
 
-
 //horrible but deterministic fake rand for testing
 uint32_t counter = 0;
 
@@ -137,7 +133,6 @@ static uint32_t randomInRange(uint32_t a,uint32_t b) {
    counter++;
    return a + (counter % (1 + b - a));
 }
-
 
 static void writeTlbExceptionExtraData(Mips * emu,uint32_t vaddr) {
     emu->CP0_BadVAddr = vaddr;
@@ -161,8 +156,6 @@ static void debug_dumpTlb(Mips * emu) {
     }
 
 } 
-
-
 
 //XXX currently hardcoded for 4k pages
 static int tlb_lookup (Mips *emu,uint32_t vaddress, uint32_t *physical, int write) {
@@ -236,8 +229,6 @@ static inline int translateAddress(Mips * emu,uint32_t vaddr,uint32_t * paddr_ou
     return 1;
     
 }
-
-
 
 static uint32_t readVirtWord(Mips * emu, uint32_t addr) {
     uint32_t paddr;
@@ -404,7 +395,6 @@ static void handleException(Mips * emu,int inDelaySlot) {
     
 }
 
-
 /* return 1 if interrupt occured else 0*/
 static int handleInterrupts(Mips * emu) {
     
@@ -424,7 +414,6 @@ static int handleInterrupts(Mips * emu) {
     return 1;
     
 }
-
 
 void step_mips(Mips * emu) {
     
@@ -554,8 +543,6 @@ static void op_swl(Mips * emu,uint32_t op) {
     writeVirtWord(emu,addr&(~3),result);
 }
 
-
-
 static void op_lwl(Mips * emu,uint32_t op) {
     int32_t c = (int16_t)(op&0x0000ffff);
     uint32_t addr = (int32_t)getRs(emu,op)+c;
@@ -585,9 +572,6 @@ static void op_lwl(Mips * emu,uint32_t op) {
     setRt(emu,op,result);
 }
 
-
-
-
 static void op_bne(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
 	if (getRs(emu,op) != getRt(emu,op) ) {
@@ -616,14 +600,10 @@ static void op_tne(Mips * emu,uint32_t op) {
 	}
 }
 
-
 static void op_andi(Mips * emu,uint32_t op) {
     uint32_t v = getRs(emu,op) & getImm(op);
     setRt(emu,op,v);
 }
-
-
-
 
 static void op_jal(Mips * emu,uint32_t op) {
 	uint32_t pc = emu->pc;
@@ -634,16 +614,10 @@ static void op_jal(Mips * emu,uint32_t op) {
 	emu->inDelaySlot = 1;
 }
 
-
-
-
 static void op_sb(Mips * emu,uint32_t op) {
 	uint32_t addr = (int32_t)getRs(emu,op) + (int16_t)getImm(op);
 	writeVirtByte(emu,addr,getRt(emu,op)&0xff);
 }
-
-
-
 
 static void op_lb(Mips * emu,uint32_t op) {
 	uint32_t addr = ((int32_t)getRs(emu,op) + (int16_t)getImm(op));
@@ -683,9 +657,6 @@ static void op_lbu(Mips * emu,uint32_t op) {
 	setRt(emu,op,v);
 }
 
-
-
-
 static void op_lw(Mips * emu,uint32_t op) {
 	int16_t offset = getImm(op);
 	uint32_t addr = ((int32_t)getRs(emu,op) + offset);
@@ -696,18 +667,12 @@ static void op_lw(Mips * emu,uint32_t op) {
 	setRt(emu,op,v);
 }
 
-
-
-
 static void op_j(Mips * emu,uint32_t op) {
 	uint32_t top = emu->pc&0xf0000000;
 	uint32_t addr = top|((op&0x3ffffff)*4);
 	emu->delaypc = addr;
 	emu->inDelaySlot = 1;
 }
-
-
-
 
 static void op_sh(Mips * emu,uint32_t op) {
 	int16_t offset = getImm(op);
@@ -721,9 +686,6 @@ static void op_sh(Mips * emu,uint32_t op) {
 	writeVirtByte(emu,addr+1,vlo);
 }
 
-
-
-
 static void op_slti(Mips * emu,uint32_t op) {
     int32_t rs = getRs(emu,op);
     int32_t c = (int16_t)getImm(op);
@@ -733,9 +695,6 @@ static void op_slti(Mips * emu,uint32_t op) {
         setRt(emu,op,0);
     }
 }
-
-
-
 
 static void op_sltiu(Mips * emu,uint32_t op) {
     uint32_t rs = getRs(emu,op);
@@ -747,32 +706,20 @@ static void op_sltiu(Mips * emu,uint32_t op) {
     }
 }
 
-
-
-
 static void op_addiu(Mips * emu,uint32_t op) {
     int32_t v = (int32_t)getRs(emu,op) + (int16_t)(getImm(op));
     setRt(emu,op,(uint32_t)v);
 }
-
-
-
 
 static void op_xori(Mips * emu,uint32_t op) {
     uint32_t v = getRs(emu,op) ^ getImm(op);
     setRt(emu,op,v);
 }
 
-
-
-
 static void op_ori(Mips * emu,uint32_t op) {
     uint32_t v = getRs(emu,op) | getImm(op);
     setRt(emu,op,v);
 }
-
-
-
 
 static void op_swr(Mips * emu,uint32_t op) {
     int32_t c = (int16_t)(op&0x0000ffff);
@@ -805,17 +752,11 @@ static void op_swr(Mips * emu,uint32_t op) {
     writeVirtWord(emu,addr&(~3),result);
 }
 
-
-
-
 static void op_sw(Mips * emu,uint32_t op) {
 	int16_t offset = getImm(op);
 	uint32_t addr = ((int32_t)getRs(emu,op) + offset);
 	writeVirtWord(emu,addr,getRt(emu,op)); 
 }
-
-
-
 
 static void op_lh(Mips * emu,uint32_t op) {
 	uint32_t addr = (int32_t)getRs(emu,op) + (int16_t)getImm(op);
@@ -831,24 +772,15 @@ static void op_lh(Mips * emu,uint32_t op) {
 	setRt(emu,op,v);
 }
 
-
-
-
 static void op_lui(Mips * emu,uint32_t op) {
 	uint32_t v = getImm(op) << 16;
 	setRt(emu,op,v);
 }
 
-
-
-
 static void op_addi(Mips * emu,uint32_t op) {
     uint32_t v = (int32_t)getRs(emu,op) + (int16_t)getImm(op);
     setRt(emu,op,v);
 }
-
-
-
 
 static void op_lhu(Mips * emu,uint32_t op) {
 	uint32_t addr = (int32_t)getRs(emu,op) + (int16_t)getImm(op);
@@ -863,9 +795,6 @@ static void op_lhu(Mips * emu,uint32_t op) {
 	uint32_t v = (vhi<<8)| vlo;
 	setRt(emu,op,v);
 }
-
-
-
 
 static void op_bgtz(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
@@ -888,8 +817,6 @@ static void op_bgtzl(Mips * emu,uint32_t op) {
 	
 }
 
-
-
 static void op_blez(Mips * emu,uint32_t op) {
 	int32_t offset = sext18(getImm(op) * 4);
 	if (((int32_t)getRs(emu,op)) <= 0) {
@@ -909,9 +836,6 @@ static void op_blezl(Mips * emu,uint32_t op) {
 		emu->pc += 4;
 	}
 }
-
-
-
 
 static void op_lwr(Mips * emu,uint32_t op) {
     int32_t c = (int16_t)(op&0x0000ffff);
@@ -1250,7 +1174,6 @@ static void op_tlbp(Mips * emu, uint32_t op) {
     }
 }
 
-
 static void op_sltu(Mips * emu,uint32_t op) {
     uint32_t rs = getRs(emu,op);
     uint32_t rt = getRt(emu,op);
@@ -1260,9 +1183,6 @@ static void op_sltu(Mips * emu,uint32_t op) {
         setRd(emu,op,0);
     }
 }
-
-
-
 
 static void op_slt(Mips * emu,uint32_t op) {
     int32_t rs = getRs(emu,op);
@@ -1274,57 +1194,33 @@ static void op_slt(Mips * emu,uint32_t op) {
     }
 }
 
-
-
-
 static void op_nor(Mips * emu,uint32_t op) {
     setRd(emu,op,~(getRs(emu,op) | getRt(emu,op)));
 }
-
-
-
 
 static void op_xor(Mips * emu,uint32_t op) {
    setRd(emu,op,getRs(emu,op) ^ getRt(emu,op));
 }
 
-
-
-
 static void op_or(Mips * emu,uint32_t op) {
     setRd(emu,op,getRs(emu,op) | getRt(emu,op));
 }
-
-
-
 
 static void op_and(Mips * emu,uint32_t op) {
     setRd(emu,op,getRs(emu,op) & getRt(emu,op));
 }
 
-
-
-
 static void op_subu(Mips * emu,uint32_t op) {
         setRd(emu,op,getRs(emu,op) -  getRt(emu,op));
 }
-
-
-
 
 static void op_sub(Mips * emu,uint32_t op) {
     setRd(emu,op,getRs(emu,op) -  getRt(emu,op));
 }
 
-
-
-
 static void op_addu(Mips * emu,uint32_t op) {
     setRd(emu,op,getRs(emu,op) + getRt(emu,op));
 }
-
-
-
 
 static void op_add(Mips * emu,uint32_t op) {
     setRd(emu,op,getRs(emu,op) + getRt(emu,op));
@@ -1366,9 +1262,6 @@ static void op_divu(Mips * emu,uint32_t op) {
     
 }
 
-
-
-
 static void op_div(Mips * emu,uint32_t op) {
     int32_t rs = getRs(emu,op);
     int32_t rt = getRt(emu,op);
@@ -1381,17 +1274,11 @@ static void op_div(Mips * emu,uint32_t op) {
     emu->hi = rs % rt;
 }
 
-
-
-
 static void op_multu(Mips * emu,uint32_t op) {
     uint64_t result = (uint64_t)getRs(emu,op) * (uint64_t)getRt(emu,op);
     emu->hi = result >> 32;
     emu->lo = result & 0xffffffff; 
 }
-
-
-
 
 static void op_mult(Mips * emu,uint32_t op) {
     int64_t result = (int64_t)(int32_t)getRs(emu,op) * (int64_t)(int32_t)getRt(emu,op);
@@ -1411,7 +1298,6 @@ static void op_movn(Mips * emu,uint32_t op) {
     }
 }
 
-
 static void op_mul(Mips * emu,uint32_t op) {
     int32_t result = (int32_t)getRs(emu,op) * (int32_t)getRt(emu,op);
     setRd(emu,op,result);
@@ -1422,13 +1308,9 @@ static void op_mflo(Mips * emu,uint32_t op) {
     setRd(emu,op,emu->lo);
 }
 
-
-
-
 static void op_mfhi(Mips * emu,uint32_t op) {
     setRd(emu,op,emu->hi);
 }
-
 
 static void op_mtlo(Mips * emu,uint32_t op) {
     emu->lo = getRs(emu,op);
@@ -1438,18 +1320,11 @@ static void op_mthi(Mips * emu,uint32_t op) {
     emu->hi = getRs(emu,op);
 }
 
-
-
-
-
 static void op_jalr(Mips * emu,uint32_t op) {
 	emu->delaypc = getRs(emu,op);
 	emu->regs[31] = emu->pc + 8;
 	emu->inDelaySlot = 1;
 }
-
-
-
 
 static void op_jr(Mips * emu,uint32_t op) {
     emu->delaypc = getRs(emu,op);
@@ -1546,8 +1421,6 @@ static void op_bltzl(Mips * emu,uint32_t op) {
 		emu->pc += 4;
 	}
 }
-
-
 
 #include "./gen/doop.gen.c"
 
