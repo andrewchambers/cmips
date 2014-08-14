@@ -4,17 +4,16 @@ cmips
 Tiny mips 4kc emulator (smallest and easiest emulator to hack on that I know of - It boots linux in a few thousands lines of C code.)
 I wrote this emulator in the month or so after I graduated university and before I started work.
 
-If this is useful to you I'd appreciate a star or credit in your project :). Let me know if it has helped you in any way, I appreciate feedback both good and bad.
+Let me know if it has helped you in any way, I appreciate any feedback.
 
 Building and Running
 ====================
-I have not put my custom linux kernel board support code online yet, so I included a precompiled kernel in the images folder.
-I have tested on linux (main platform) and cygwin in windows.
 
-Here is a gif
+How to compile and run the emulator.
 
+![example gif](example.gif)
 
-showing how to compile and run the emulator.
+I have not put my custom linux kernel board support code online yet, so I included a precompiled kernel in the images folder. I have tested on linux (main platform) and cygwin in windows.
 
 
 Motivations
