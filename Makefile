@@ -11,5 +11,5 @@ emu: ./src/*.c ./src/gen/doop.gen.c ./include/*.h
 	python ./disgen/disgen.py ./disgen/cdisgen.py ./disgen/mips.json > ./src/gen/doop.gen.c
 
 clean:
-	rm -vf ./src/common/gen/
+	rm -vrf ./src/gen/
 	rm -fv ./emu
